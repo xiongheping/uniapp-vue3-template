@@ -27,3 +27,6 @@ unpackage
 # pnpm-lock.yaml
 yarn.lock
 package-lock.json
+
+# Agent 工作区数据（不纳入版本库）
+.workbuddy/

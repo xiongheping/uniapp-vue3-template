@@ -31,4 +31,5 @@ onHide(() => {
 /* 每个页面公共css */
 @import 'uview-plus/index.scss';
 @import '@/static/styles/common.scss';
+@import '@/static/styles/tokens.scss';
 </style>

@@ -26,6 +26,18 @@ export default {
     'color-hex-length': null,
     'import-notation': 'string',
 
+    // --- 命名约定：项目统一使用 BEM（block__element--modifier） ---
+    // 默认 standard 只允许 kebab-case，BEM 的 __ / -- 会全量报错，故显式放开
+    'selector-class-pattern': [
+      '^[a-z][a-z0-9]*(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$',
+      {
+        message: '类名需为 kebab-case 或 BEM（block__element--modifier）',
+        resolveNestedSelectors: true,
+      },
+    ],
+    // postcss-html 会把模板内联 style="..." 当作声明列表解析，误报「声明位置非法」，关闭该规则
+    'no-invalid-position-declaration': null,
+
     // --- UniApp & 小程序适配 ---
     // 允许 rpx 单位
     'unit-no-unknown': [true, {

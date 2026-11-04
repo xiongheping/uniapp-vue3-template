@@ -75,15 +75,9 @@ export function isPathExists(path = '') {
 }
 
 /**
- * 是否是tabbar页面路径
- * @param {string} path
- * @returns {boolean} 是否是tabbar页面
+ * 跳转首页
+ * 原生 tabBar 已移除（自定义 x-tabbar），统一走 redirectTo 保持单层栈
  */
-export function isTabBarPath(path = '') {
-  const cleanPath = removeQueryString(path);
-  return (
-    pagesJson.tabBar?.list?.some(
-      item => `/${item.pagePath}` === cleanPath,
-    ) === true
-  );
+export function redirectToHomePage() {
+  uni.redirectTo({ url: HOME_PATH });
 }

@@ -50,6 +50,11 @@ export default defineConfig({
   rules: [
     ['pb-safe', { 'padding-bottom': 'env(safe-area-inset-bottom)' }],
   ],
+  /**
+   * 误提取候选过滤：源码中的时间字符串（如 00:00:00）会被 attributify 提取器
+   * 误判为属性选择器，生成空声明规则并触发 css-syntax-error 警告
+   */
+  blocklist: [/^\[00:00/, /^\[0:00/],
   theme: {
     colors: {
       // 主题颜色

@@ -1,0 +1,154 @@
+/**
+ * 小七管家 Design Tokens（原型 25）
+ * 色板 / 字号 / 圆角 / 阴影 / 触控热区，与原型 1:1 对齐（1px = 2rpx）
+ */
+:root,
+page {
+  // 品牌色
+  --color-primary: #4f7cff;
+  --color-primary-2: #7b5cff;
+  --color-primary-soft: #f0f4ff;
+  --color-success: #52c41a;
+  --color-success-text: #2e7d32;
+
+  // 文字
+  --color-text: #1a2233;
+  --color-text-sub: #6b7590;
+  --color-text-weak: #8a93a5;
+  --color-text-mute: #b0b7c3;
+
+  // 背景 / 填充
+  --color-bg: #f5f7fb;
+  --color-card: #ffffff;
+  --color-fill: #eef0f5;
+  --color-fill-light: #f5f7fb;
+
+  // 边框
+  --color-border: #e4e8f0;
+  --color-divider: #f2f4f8;
+
+  // 语义色
+  --color-danger: #d93025;
+  --color-danger-strong: #fa5151;
+  --color-warning-strong: #ff7a45;
+  --color-warning-text: #c77700;
+  --color-note-bg: #fff9e6;
+  --color-note-text: #7a5b00;
+  --color-note-bar: #ffb020;
+  --color-note-blue-bg: #f0f5ff;
+  --color-note-blue-text: #2c3e7a;
+  --color-note-red-bg: #ffeded;
+  --color-note-red-text: #8c1d18;
+  --color-note-green-bg: #f0faf0;
+  --color-note-green-text: #2e5c1e;
+  --color-note-green-bar: #52c41a;
+  --color-note-purple-bg: #f8f4ff;
+  --color-note-purple-text: #4a2e8c;
+  --color-note-purple-bar: #7b3ff2;
+
+  // 字号
+  --fs-h1: 44rpx;
+  --fs-title: 34rpx;
+  --fs-nav: 32rpx;
+  --fs-body: 28rpx;
+  --fs-sub: 24rpx;
+  --fs-caption: 22rpx;
+  --fs-mini: 20rpx;
+
+  // 圆角
+  --radius-card: 32rpx;
+  --radius-cell: 28rpx;
+  --radius-pill: 999rpx;
+
+  // 阴影
+  --shadow-card: 0 2rpx 6rpx rgb(20 30 60 / 4%);
+  --shadow-fab: 0 16rpx 40rpx rgb(79 124 255 / 42%);
+
+  // 触控热区
+  --h-cell: 88rpx;
+  --h-touch: 96rpx;
+}
+
+/**
+ * 暗黑模式（原型 23）：x-page 根节点挂 .dark
+ */
+.xp-root.dark {
+  --color-text: #f0f2f6;
+  --color-text-sub: #8a93a5;
+  --color-text-weak: #8a93a5;
+  --color-text-mute: #5a6275;
+  --color-bg: #12141a;
+  --color-card: #1c2029;
+  --color-fill: #2a2f3a;
+  --color-fill-light: #22262f;
+  --color-border: #2a2f3a;
+  --color-divider: #2a2f3a;
+  --color-primary-soft: #223055;
+  --color-note-bg: #2a2418;
+  --color-note-text: #e8c97a;
+  --color-note-blue-bg: #1a2440;
+  --color-note-blue-text: #9db6ff;
+  --color-note-red-bg: #3a1d1d;
+  --color-note-red-text: #ffb3b3;
+  --color-note-green-bg: #1c2e1c;
+  --color-note-green-text: #a8e6a0;
+  --color-note-purple-bg: #241d3a;
+  --color-note-purple-text: #c9b0ff;
+  --shadow-card: 0 2rpx 6rpx rgb(0 0 0 / 40%);
+}
+
+/**
+ * 长辈模式（原型 24）：辅助文字 16px 起，按钮加大
+ */
+.xp-root.elder {
+  --fs-h1: 44rpx;
+  --fs-title: 40rpx;
+  --fs-nav: 38rpx;
+  --fs-body: 36rpx;
+  --fs-sub: 32rpx;
+  --fs-caption: 30rpx;
+  --fs-mini: 28rpx;
+  --h-cell: 108rpx;
+  --h-touch: 116rpx;
+}
+
+/* ========== 通用工具类 ========== */
+
+.x-flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.x-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.x-sub {
+  font-size: var(--fs-sub);
+  color: var(--color-text-sub);
+}
+
+.x-section-title {
+  margin-bottom: 16rpx;
+  font-size: var(--fs-sub);
+  font-weight: 700;
+  color: var(--color-text-sub);
+}
+
+/* 按钮组：横向排列 */
+.x-btns.row {
+  display: flex;
+  gap: 16rpx;
+
+  > .x-button {
+    flex: 1;
+    margin-top: 0;
+  }
+}
+
+/* 吸底安全区 */
+.x-safe-bottom {
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom, 0px));
+}
