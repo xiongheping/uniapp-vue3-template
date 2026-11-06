@@ -3,12 +3,14 @@
     <view
       v-for="item in TAB_BAR_LIST"
       :key="item.path"
-      class="xtb__tab"
+      class="xtb__tab x-tap-opacity"
       :class="{ on: item.path === active }"
+      hover-class="x-tap-opacity--hover"
+      :hover-start-time="0"
       @tap="onTap(item.path)"
     >
       <view class="xtb__ico-wrap">
-        <x-icon :name="item.icon" :size="44" :color="item.path === active ? '#4F7CFF' : '#6B7590'" />
+        <x-icon :name="item.icon" :size="tabIconSize" :color="item.path === active ? '#4F7CFF' : '#6B7590'" />
         <view v-if="badgeCount(item.badge) > 0" class="xtb__badge">
           {{ badgeCount(item.badge) }}
         </view>
@@ -22,12 +24,14 @@
 
 <script setup lang="ts">
 import type { BadgeType } from '@/store/modules/message/types';
+import { computed } from 'vue';
 import { switchTabPath, TAB_BAR_LIST } from '@/router/tab-bar';
-import { useMessageStore } from '@/store';
+import { useMessageStore, useSettingStore } from '@/store';
 
 /**
  * 自定义底部导航（原生 tabBar 已移除）
  * 4 tab：首页 / 用药 / 消息 / 我的；角标口径见 tab-bar.ts
+ * elder 模式放大（原型 .elder .tab 13px / .tab-ico 28px）
  */
 interface Props {
   /** 当前激活 tab 路径 */
@@ -36,6 +40,10 @@ interface Props {
 
 const props = defineProps<Props>();
 const messageStore = useMessageStore();
+const settingStore = useSettingStore();
+
+/** tab 图标：常规 44rpx，elder 56rpx（原型 22px / 28px） */
+const tabIconSize = computed<number>(() => (settingStore.isElder ? 56 : 44));
 
 function badgeCount(type: BadgeType): number {
   return type === 'p0' ? messageStore.unreadP0 : messageStore.unreadTotal;
@@ -52,10 +60,10 @@ function onTap(path: string) {
 .xtb {
   display: flex;
   flex-shrink: 0;
-  height: 120rpx;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  height: var(--h-tabbar);
+  padding-bottom: calc(28rpx + env(safe-area-inset-bottom, 0px));
   background: var(--color-card);
-  border-top: 2rpx solid var(--color-divider);
+  border-top: 2rpx solid var(--color-tabbar-border);
 }
 
 .xtb__tab {
@@ -63,7 +71,7 @@ function onTap(path: string) {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4rpx;
+  gap: 8rpx;
   align-items: center;
   justify-content: center;
   min-height: 88rpx;
@@ -89,7 +97,7 @@ function onTap(path: string) {
 }
 
 .xtb__text {
-  font-size: 20rpx;
+  font-size: var(--fs-tab);
   color: var(--color-text-sub);
 }
 

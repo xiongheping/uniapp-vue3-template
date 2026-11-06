@@ -51,6 +51,8 @@ export default antfu(
       'antfu/if-newline': 'off',
       // 禁止必需的props属性同时设置默认值
       'vue/no-required-prop-with-default': 'off',
+      // 不强制 pnpm 安装策略（shellEmulator / trustPolicy 属个人环境偏好，模板不锁定）
+      'pnpm/yaml-enforce-settings': 'off',
     },
   },
 );

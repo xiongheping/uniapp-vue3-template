@@ -31,7 +31,7 @@ function toggle() {
   flex-shrink: 0;
   width: 88rpx;
   height: 48rpx;
-  background: var(--color-fill);
+  background: var(--color-switch-off);
   border-radius: 24rpx;
   transition: background 0.2s;
 }

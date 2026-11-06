@@ -44,6 +44,9 @@ importers:
       uview-plus:
         specifier: ^3.8.130
         version: 3.8.130
+      vu-icons:
+        specifier: ^1.5.4
+        version: 1.5.4(vue@3.4.21(typescript@5.8.3))
       vue:
         specifier: 3.4.21
         version: 3.4.21(typescript@5.8.3)
@@ -8764,6 +8767,11 @@ packages:
 
   vscode-uri@3.1.0:
     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
+
+  vu-icons@1.5.4:
+    resolution: {integrity: sha512-LZ+jLxhGJKfGL0JEEgAod+f1enGx0bDUZHWs2c9s9cDWlOjX1CkjYi1GdhBGrSOqrKgL6T2tJVuSs4FXSqUo2Q==}
+    peerDependencies:
+      vue: 3.4.21
 
   vue-demi@0.14.10:
     resolution: {integrity: sha512-nMZBOwuzabUO0nLgIcc6rycZEebF6eeUfaiQx9+WSk8e29IbLvPU9feI6tqW4kTo3hvoYAJkMh8n8D0fuISphg==}
@@ -20334,6 +20342,10 @@ snapshots:
       terser: 5.44.1
 
   vscode-uri@3.1.0: {}
+
+  vu-icons@1.5.4(vue@3.4.21(typescript@5.8.3)):
+    dependencies:
+      vue: 3.4.21(typescript@5.8.3)
 
   vue-demi@0.14.10(vue@3.4.21(typescript@5.8.3)):
     dependencies:

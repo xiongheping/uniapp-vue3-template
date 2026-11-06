@@ -10,9 +10,11 @@
             {{ cnDate() }}
           </text>
         </view>
-        <view class="home-nav__fam" @tap="gotoFamily">
-          <x-icon name="users" :size="14" />
-          <text>家庭</text>
+        <view class="home-nav__right">
+          <view class="home-nav__fam x-tap-scale" hover-class="x-tap-scale--hover" :hover-start-time="0" @tap="gotoFamily">
+            <x-icon name="users" :size="28" />
+            <text>家庭</text>
+          </view>
         </view>
       </view>
     </x-nav-bar>
@@ -48,13 +50,13 @@
           <x-button text="↻ 重试" @click="retry" />
         </view>
       </view>
-      <x-note tone="green">
+      <x-note type="green">
         ✓ 本地模式可用：核心功能不依赖网络，恢复后自动同步。
       </x-note>
     </template>
 
-    <!-- 07a 空态：四要素齐备 -->
-    <template v-else-if="isEmpty">
+    <!-- 07a 空态：四要素齐备（「添加第一件」按钮 vs 列表由 viewMode 变量控制） -->
+    <template v-else-if="showEmpty">
       <view class="home-state">
         <text class="home-state__emoji home-state__emoji--dim">
           📦
@@ -72,7 +74,7 @@
           或手动输入 / 扫条码 ›
         </text>
       </view>
-      <x-note tone="blue">
+      <x-note type="blue">
         💡 药品和护肤品最值得先管起来。
       </x-note>
     </template>
@@ -80,16 +82,18 @@
     <!-- 07 默认态 / 07d 批量入口 -->
     <template v-else>
       <!-- 概览 tile：按下缩放，badge 口径 = 各分组件数 -->
-      <view class="x-card home-digest">
+      <view class="home-digest">
         <view class="home-tiles">
           <view
             v-for="t in tiles"
             :key="t.key"
-            class="home-tile"
-            :class="{ 'home-tile--on': chip === 'all' || t.on }"
+            class="home-tile x-tap-on-color"
+            :class="{ 'home-tile--on': isTileOn(t.key) }"
+            hover-class="x-tap-on-color--hover"
+            :hover-start-time="0"
             @tap="filterByTile(t)"
           >
-            <text class="home-tile__num" :class="`home-tile__num--${t.key}`">
+            <text class="home-tile__num">
               {{ t.n }}
             </text>
             <text class="home-tile__label">
@@ -97,10 +101,12 @@
             </text>
           </view>
         </view>
-        <view v-if="todoText" class="home-todo" @tap="gotoMedicine">
-          <x-icon name="pill" :size="16" />
+        <view v-if="todoStrong" class="home-todo x-tap-on-color" hover-class="x-tap-on-color--hover" :hover-start-time="0" @tap="gotoMedicine">
+          <x-icon name="pill" :size="32" />
           <text class="home-todo__text">
-            {{ todoText }}
+            {{ todoLabel }}<text class="home-todo__strong">
+              {{ todoStrong }}
+            </text>
           </text>
           <text class="home-todo__go">
             去用药 ›
@@ -111,7 +117,7 @@
       <!-- 搜索 + 排序 + 批量 -->
       <view class="home-tools">
         <view class="home-search">
-          <x-icon name="search" :size="16" color="#8A93A5" />
+          <x-icon name="search" :size="32" color="#8A93A5" />
           <input
             v-model="itemStore.keyword"
             class="home-search__input"
@@ -119,12 +125,9 @@
             confirm-type="search"
           >
         </view>
-        <view class="home-tool-btn" @tap="toggleSort">
-          <x-icon name="sort" :size="16" />
+        <view class="home-tool-btn x-tap" hover-class="x-tap--hover" :hover-start-time="0" @tap="toggleSort">
+          <x-icon name="sort" :size="32" />
           <text>{{ sortMode === 'due' ? '按到期日' : '按添加时间' }}</text>
-        </view>
-        <view class="home-tool-btn home-tool-btn--accent" @tap="gotoBatch">
-          <text>批量</text>
         </view>
       </view>
 
@@ -133,25 +136,36 @@
         <view
           v-for="c in chips"
           :key="c.key"
-          class="home-chip"
+          class="home-chip x-tap-scale"
           :class="{ 'home-chip--on': chip === c.key }"
+          hover-class="x-tap-scale--hover"
+          :hover-start-time="0"
           @tap="onChipTap(c.key)"
         >
-          <x-icon v-if="c.icon" :name="c.icon" :size="12" />
+          <x-icon v-if="c.icon" :name="c.icon" :size="24" />
           <text>{{ c.label }}</text>
         </view>
       </view>
 
-      <!-- 分组列表 -->
+      <!-- 分组列表：过期 / 临期展开；安全组按原型只显示条数，点开再看 -->
       <template v-for="g in groups" :key="g.key">
         <template v-if="g.items.length">
           <view class="home-grp-bar">
             <text>{{ g.title }} · {{ g.items.length }}</text>
-            <text class="home-grp-bar__more" @tap="gotoArchive">
+            <text
+              v-if="g.key === 'safe'"
+              class="home-grp-bar__more x-tap-opacity"
+              hover-class="x-tap-opacity--hover"
+              :hover-start-time="0"
+              @tap="expandSafe = !expandSafe"
+            >
+              {{ safeOpen ? '收起 ›' : '查看全部 ›' }}
+            </text>
+            <text v-else class="home-grp-bar__more x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="gotoArchive">
               查看全部 ›
             </text>
           </view>
-          <view class="x-card home-grp">
+          <view v-show="g.key !== 'safe' || safeOpen" class="x-card home-grp x-expand">
             <view
               v-for="it in g.items"
               :key="it.id"
@@ -166,15 +180,18 @@
                 </view>
               </view>
               <view
-                class="home-row"
+                class="home-row x-tap-bg"
+                hover-class="x-tap--hover"
+                :hover-start-time="0"
                 :style="{ transform: `translateX(${offsetOf(it.id)}px)` }"
                 @touchstart="onTouchStart($event, it.id)"
                 @touchmove="onTouchMove"
                 @touchend="onTouchEnd(it)"
                 @tap="gotoDetail(it)"
+                @longpress="gotoBatch"
               >
                 <view class="home-row__ico" :class="`tone-${toneOf(it)}`">
-                  <x-icon :name="iconOf(it.category)" :size="20" />
+                  <x-icon :name="iconOf(it.category)" :size="40" />
                 </view>
                 <view class="home-row__grow">
                   <text class="home-row__t1">
@@ -184,7 +201,7 @@
                     {{ subOf(it) }}
                   </text>
                 </view>
-                <x-tag :tone="toneOf(it)">
+                <x-tag :type="toneOf(it)">
                   {{ tagOf(it) }}
                 </x-tag>
               </view>
@@ -194,26 +211,26 @@
       </template>
 
       <view v-if="!groups.some(g => g.items.length)" class="home-nomatch">
-        <text>没有匹配「{{ itemStore.keyword }}」的物品</text>
-        <text class="home-nomatch__clear" @tap="itemStore.keyword = ''">
+        <text>{{ itemStore.keyword ? `没有匹配「${itemStore.keyword}」的物品` : '暂无物品，点右下角 + 添加' }}</text>
+        <text v-if="itemStore.keyword" class="home-nomatch__clear" @tap="itemStore.keyword = ''">
           清除搜索
         </text>
       </view>
 
-      <x-note tone="blue">
-        👆 左滑「还在用」询问：顺延 30 天 / 保持 / 取消，操作后可撤销。
+      <x-note type="blue">
+        👆 左滑「还在用」询问：顺延 30 天 / 保持 / 取消，操作后可撤销。点 tile 可预筛选分组；Tab 角标 3 为总未读。长按任意物品可进入批量管理。
       </x-note>
 
       <!-- FAB -->
-      <view class="home-fab" @tap="gotoAdd">
-        <x-icon name="plus" :size="22" color="#fff" />
+      <view class="home-fab x-tap-on-color" hover-class="x-tap-on-color--hover" :hover-start-time="0" @tap="gotoAdd">
+        <x-icon name="plus" :size="44" color="#fff" />
       </view>
 
       <!-- 左滑「还在用」：顺延 30 天 / 保持 / 取消 -->
       <x-sheet v-model:show="showKeep" title="还在用 · 连花清瘟胶囊">
         <view class="home-keep-opts">
-          <view class="home-keep-opt" @tap="doPostpone(30)">
-            <x-icon name="clock" :size="18" />
+          <view class="home-keep-opt x-tap" hover-class="x-tap--hover" :hover-start-time="0" @tap="doPostpone(30)">
+            <x-icon name="clock" :size="36" />
             <view class="home-keep-opt__grow">
               <text class="home-keep-opt__t1">
                 顺延 30 天
@@ -223,8 +240,8 @@
               </text>
             </view>
           </view>
-          <view class="home-keep-opt" @tap="showKeep = false">
-            <x-icon name="check" :size="18" />
+          <view class="home-keep-opt x-tap" hover-class="x-tap--hover" :hover-start-time="0" @tap="showKeep = false">
+            <x-icon name="check" :size="36" />
             <view class="home-keep-opt__grow">
               <text class="home-keep-opt__t1">
                 保持不变
@@ -257,6 +274,28 @@ const userStore = useUserStore();
 
 const userName = computed<string>(() => userStore.user_name || '朋友');
 const loadState = ref<LoadState>('skeleton');
+
+/**
+ * 展示模式开关：决定首页渲染「添加按钮（空态）」还是「物品列表（07 默认态）」
+ * - 'auto'  按真实数据判断（默认）：有在用物品 → 列表，没有 → 添加引导
+ * - 'list'  强制列表界面
+ * - 'empty' 强制添加引导（预览 07a 空态，展示「📷 拍照添加第一件」）
+ */
+type HomeViewMode = 'auto' | 'list' | 'empty';
+
+const viewMode = ref<HomeViewMode>('auto');
+
+/** 是否展示添加引导而非列表 */
+const showEmpty = computed<boolean>(() => {
+  if (viewMode.value === 'empty') {
+    return true;
+  }
+  if (viewMode.value === 'list') {
+    return false;
+  }
+  return itemStore.stats.active === 0;
+});
+
 /** 分组筛选项：分类 chip 与 tile 预筛选共用 */
 type HomeFilter = 'all' | ItemCategory | 'manage' | 'expired' | 'expiring' | 'safe';
 
@@ -264,6 +303,8 @@ const chip = ref<HomeFilter>('all');
 const sortMode = ref<'due' | 'added'>('due');
 const showKeep = ref(false);
 const keepTarget = ref<ItemView | null>(null);
+/** 安全组默认折叠（原型 07 只显示条数），搜索或 tile 预筛选时自动展开 */
+const expandSafe = ref(false);
 
 /** 左滑位移记录：key = 物品 id */
 const swipeOffsets = ref<Record<string, number>>({});
@@ -271,20 +312,37 @@ let touchStartX = 0;
 let touchStartY = 0;
 let swipeTargetId = '';
 
-const isEmpty = computed<boolean>(() => itemStore.stats.active === 0);
+const safeOpen = computed<boolean>(() =>
+  expandSafe.value || chip.value === 'safe' || !!itemStore.keyword.trim(),
+);
 
 const tiles = computed(() => [
-  { key: 'expired', label: '🔴 过期', n: itemStore.stats.expired, on: chip.value === 'expired' },
-  { key: 'expiring', label: '⚠️ 临期', n: itemStore.stats.expiring, on: chip.value === 'expiring' },
-  { key: 'safe', label: '✓ 安全', n: itemStore.stats.active - itemStore.stats.expired - itemStore.stats.expiring, on: chip.value === 'safe' },
+  { key: 'expired', label: '🔴 过期', n: itemStore.stats.expired },
+  { key: 'expiring', label: '⚠️ 临期', n: itemStore.stats.expiring },
+  { key: 'safe', label: '✓ 安全', n: itemStore.stats.active - itemStore.stats.expired - itemStore.stats.expiring },
 ]);
 
-const todoText = computed<string>(() => {
+/** tile 高亮：仅表示「当前正按该分组筛选」 */
+function isTileOn(key: string): boolean {
+  return chip.value === key;
+}
+
+/** 今日待办：拆成「今日待办：」+ 加粗结论，对齐原型 07 todo 行 */
+const todoLabel = computed<string>(() => {
   if (medicineStore.isAllDone) {
-    return `今日用药已完成 ${medicineStore.todayDone}/${medicineStore.todayTotal} ✓`;
+    return '今日用药已完成 ';
   }
   if (medicineStore.pendingEntries.length > 0) {
-    return `今日待办：${medicineStore.pendingEntries.length} 次服药未打卡`;
+    return '今日待办：';
+  }
+  return '';
+});
+const todoStrong = computed<string>(() => {
+  if (medicineStore.isAllDone) {
+    return `${medicineStore.todayDone}/${medicineStore.todayTotal} ✓`;
+  }
+  if (medicineStore.pendingEntries.length > 0) {
+    return `${medicineStore.pendingEntries.length} 次服药未打卡`;
   }
   return '';
 });
@@ -514,16 +572,37 @@ function onChipTap(key: HomeFilter) {
   color: var(--color-text-sub);
 }
 
+.home-nav__right {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.home-nav__ibtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-touch);
+  height: var(--h-touch);
+  color: var(--color-text-sub);
+  background: var(--color-primary-light);
+  border-radius: var(--radius-cell);
+
+  &:active {
+    opacity: 0.7;
+  }
+}
+
 .home-nav__fam {
   display: flex;
-  gap: 8rpx;
+  gap: 10rpx;
   align-items: center;
-  padding: 12rpx 24rpx;
-  font-size: var(--fs-sub);
+  padding: 10rpx 20rpx;
+  font-size: var(--fs-caption);
   font-weight: 600;
   color: var(--color-primary);
   background: var(--color-primary-light);
-  border-radius: var(--radius-cell);
+  border-radius: 24rpx;
 }
 
 /* 骨架屏（07b）：形状与真实卡片一致 */
@@ -627,14 +706,18 @@ function onChipTap(key: HomeFilter) {
   color: var(--color-primary);
 }
 
-/* 概览 */
+/* 概览（原型 07 .digest：蓝紫渐变卡，tile 为半透明白） */
 .home-digest {
-  margin-bottom: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+  color: #ffffff;
+  background: linear-gradient(135deg, #4f7cff, #7b5cff);
 }
 
 .home-tiles {
   display: flex;
   gap: 16rpx;
+  margin: 4rpx 0 20rpx;
 }
 
 .home-tile {
@@ -642,58 +725,56 @@ function onChipTap(key: HomeFilter) {
   flex: 1;
   flex-direction: column;
   align-items: center;
-  padding: 20rpx 0;
-  background: var(--color-fill-light);
-  border-radius: var(--radius-cell);
-  transition: transform 0.12s ease;
+  padding: 20rpx 8rpx 24rpx;
+  background: rgb(255 255 255 / 16%);
+  border: 2rpx solid transparent;
+  border-radius: 24rpx;
+  transition: transform 0.12s ease, border-color 0.12s ease;
 
   &:active {
-    transform: scale(0.94);
+    transform: scale(0.96);
   }
+}
+
+/* 当前按该分组筛选时高亮（原型：默认无高亮） */
+.home-tile--on {
+  background: rgb(255 255 255 / 30%);
+  border-color: rgb(255 255 255 / 85%);
 }
 
 .home-tile__num {
   font-size: var(--fs-num);
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.home-tile__num--expired {
-  color: var(--color-danger);
-}
-
-.home-tile__num--expiring {
-  color: var(--color-warning);
-}
-
-.home-tile__num--safe {
-  color: var(--color-success);
+  font-weight: 800;
+  line-height: 1.1;
+  color: #ffffff;
 }
 
 .home-tile__label {
-  margin-top: 6rpx;
-  font-size: var(--fs-sub);
-  color: var(--color-text-sub);
+  margin-top: 4rpx;
+  font-size: var(--fs-caption);
+  color: #ffffff;
+  opacity: 0.9;
 }
 
 .home-todo {
   display: flex;
-  gap: 12rpx;
+  gap: 16rpx;
   align-items: center;
-  padding: 20rpx 24rpx;
-  margin-top: 20rpx;
-  color: #fff;
-  background: var(--color-primary);
-  border-radius: var(--radius-cell);
+  padding-top: 20rpx;
+  font-size: var(--fs-sub);
+  color: #ffffff;
+  border-top: 2rpx solid rgb(255 255 255 / 22%);
 }
 
 .home-todo__text {
   flex: 1;
-  font-size: var(--fs-sub);
+}
+
+.home-todo__strong {
+  font-weight: 700;
 }
 
 .home-todo__go {
-  font-size: var(--fs-sub);
   opacity: 0.9;
 }
 
@@ -708,12 +789,11 @@ function onChipTap(key: HomeFilter) {
 .home-search {
   display: flex;
   flex: 1;
-  gap: 12rpx;
+  gap: 16rpx;
   align-items: center;
-  min-height: var(--h-touch);
-  padding: 0 24rpx;
+  min-height: 88rpx;
+  padding: 0 28rpx;
   background: var(--color-card);
-  border: 2rpx solid var(--color-divider);
   border-radius: var(--radius-cell);
 }
 
@@ -726,64 +806,67 @@ function onChipTap(key: HomeFilter) {
 
 .home-tool-btn {
   display: flex;
-  gap: 8rpx;
+  gap: 10rpx;
   align-items: center;
-  min-height: var(--h-touch);
-  padding: 0 20rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
   font-size: var(--fs-sub);
   font-weight: 600;
-  color: var(--color-primary);
+  color: #3d5af1;
   background: var(--color-card);
   border-radius: var(--radius-cell);
-}
-
-.home-tool-btn--accent {
-  color: #fff;
-  background: var(--color-primary);
 }
 
 /* 分类 chips */
 .home-chips {
   display: flex;
-  gap: 14rpx;
-  margin-bottom: 24rpx;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
   overflow-x: auto;
 }
 
 .home-chip {
   display: flex;
   flex-shrink: 0;
-  gap: 6rpx;
+  gap: 12rpx;
   align-items: center;
-  min-height: 60rpx;
-  padding: 0 24rpx;
+  min-height: 76rpx;
+  padding: 0 28rpx;
   font-size: var(--fs-sub);
-  color: var(--color-text-sub);
+  color: #5b6478;
   background: var(--color-card);
-  border: 2rpx solid var(--color-divider);
-  border-radius: var(--radius-cell);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-pill);
+  transition:
+    background-color var(--dur-normal) var(--ease-out),
+    border-color var(--dur-normal) var(--ease-out),
+    color var(--dur-normal) var(--ease-out);
 }
 
 .home-chip--on {
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--color-primary);
   border-color: var(--color-primary);
 }
 
-/* 分组 */
+/* 分组（原型 .grp-bar：浅蓝底 + #3D5AF1 文字） */
 .home-grp-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20rpx 8rpx 12rpx;
+  padding: 12rpx 20rpx;
+  margin: 24rpx 0 16rpx;
   font-size: var(--fs-sub);
   font-weight: 700;
-  color: var(--color-text);
+  color: #3d5af1;
+  background: #e9eef8;
+  border-radius: 16rpx;
 }
 
 .home-grp-bar__more {
-  font-weight: 400;
-  color: var(--color-text-sub);
+  font-weight: 600;
+  color: #3d5af1;
 }
 
 .home-grp {
@@ -829,18 +912,18 @@ function onChipTap(key: HomeFilter) {
   font-size: var(--fs-sub);
   font-weight: 600;
   color: #fff;
-  background: var(--color-warning);
+  background: #ffa940;
 }
 
 .home-swipe-actions__throw {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 140rpx;
+  width: 128rpx;
   font-size: var(--fs-sub);
   font-weight: 600;
   color: #fff;
-  background: var(--color-danger);
+  background: var(--color-danger-strong);
 }
 
 .home-row__ico {
@@ -848,9 +931,9 @@ function onChipTap(key: HomeFilter) {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: var(--radius-cell);
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 24rpx;
 }
 
 .tone-red {
@@ -864,7 +947,7 @@ function onChipTap(key: HomeFilter) {
 }
 
 .tone-green {
-  color: var(--color-success);
+  color: var(--color-success-text);
   background: var(--color-success-light);
 }
 
@@ -905,16 +988,16 @@ function onChipTap(key: HomeFilter) {
 .home-fab {
   position: fixed;
   right: 36rpx;
-  bottom: calc(160rpx + env(safe-area-inset-bottom, 0px));
+  bottom: calc(192rpx + env(safe-area-inset-bottom, 0px));
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 108rpx;
-  height: 108rpx;
+  width: 116rpx;
+  height: 116rpx;
   background: var(--color-primary);
   border-radius: 50%;
-  box-shadow: 0 12rpx 32rpx rgb(61 90 241 / 35%);
+  box-shadow: 0 16rpx 40rpx rgb(79 124 255 / 42%);
   transition: transform 0.12s ease;
 
   &:active {

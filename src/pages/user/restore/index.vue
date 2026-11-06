@@ -21,9 +21,9 @@
     <!-- 冲突处理：三选一互斥 radio -->
     <x-card>
       <view class="rs-sec">
-        冲突处理
+        冲突处理（默认已选「合并保留最新修改」）
       </view>
-      <view v-for="opt in conflictOptions" :key="opt.value" class="rs-opt" @tap="conflictStrategy = opt.value">
+      <view v-for="opt in conflictOptions" :key="opt.value" class="rs-opt x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0" @tap="conflictStrategy = opt.value">
         <view class="rs-opt__head">
           <text class="rs-opt__label">
             {{ opt.label }}

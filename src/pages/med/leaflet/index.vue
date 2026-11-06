@@ -92,7 +92,7 @@
         <x-button type="ghost" text="🔗 药监数据库" @click="gotoNmpa" />
       </view>
 
-      <x-note tone="purple">
+      <x-note type="purple">
         ℹ️ 内容逐字摘自药品说明书，不构成用药建议。不适请咨询医生或药师。
       </x-note>
     </template>
@@ -125,11 +125,11 @@ const sizes = [
   { key: 'l' as const, label: 'A+' },
 ];
 
-/** 三档字号：正文 14/16/19px，标题与辅助文字同步缩放 */
+/** 三档字号：正文 30rpx（原型 15px），标题与辅助文字同步缩放；运行时用 upx2px 保证 H5 也生效 */
 function fontStyle(kind: 'title' | 'body' | 'sub'): Record<string, string> {
   const scale = { s: 0.875, m: 1, l: 1.19 }[fontKey.value];
-  const base = { title: 17, body: 15, sub: 13 }[kind];
-  return { fontSize: `${Math.round(base * scale)}px` };
+  const base = { title: 34, body: 30, sub: 26 }[kind];
+  return { fontSize: `${uni.upx2px(Math.round(base * scale))}px` };
 }
 
 const hasText = computed<boolean>(() => {
@@ -167,6 +167,7 @@ function gotoNmpa() {
 </script>
 
 <style lang="scss" scoped>
+/* 原型 12：A-/A/A+ chip（11px 字号 + 4px 10px 内边距） */
 .lf-sizes {
   display: flex;
   gap: 8rpx;
@@ -176,18 +177,18 @@ function gotoNmpa() {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 56rpx;
-  min-height: 52rpx;
-  font-size: var(--fs-sub);
-  font-weight: 600;
+  padding: 8rpx 20rpx;
+  font-size: 22rpx;
   color: var(--color-text-sub);
-  background: var(--color-fill-light);
-  border-radius: var(--radius-cell);
+  background: var(--color-card);
+  border: 2rpx solid var(--color-border);
+  border-radius: 40rpx;
 }
 
 .lf-size--on {
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  color: #ffffff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .lf-head {

@@ -1,12 +1,12 @@
 <template>
   <view class="xq">
-    <button class="xq__btn" @tap="emit('decrease')">
+    <button class="xq__btn" hover-class="xq__btn--hover" :hover-start-time="0" @tap="emit('decrease')">
       −
     </button>
     <text class="xq__val">
       {{ text || modelValue }}
     </text>
-    <button class="xq__btn" @tap="emit('increase')">
+    <button class="xq__btn" hover-class="xq__btn--hover" :hover-start-time="0" @tap="emit('increase')">
       +
     </button>
   </view>
@@ -49,6 +49,12 @@ const emit = defineEmits<{ decrease: []; increase: [] }>();
   background: var(--color-card);
   border: 2rpx solid var(--color-fill);
   border-radius: 16rpx;
+  transition: opacity var(--dur-normal) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.xq__btn--hover {
+  opacity: 0.85;
+  transform: scale(0.94);
 }
 
 .xq__val {

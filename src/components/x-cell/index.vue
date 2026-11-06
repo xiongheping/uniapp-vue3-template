@@ -1,7 +1,7 @@
 <template>
-  <view class="xcl" :class="{ 'xcl--last': last }" @tap="emit('click')">
+  <view class="xcl x-tap" :class="{ 'xcl--last': last }" hover-class="x-tap--hover" :hover-start-time="0" @tap="emit('click')">
     <view v-if="icon" class="xcl__ico" :style="{ background: icoBg(tone) }">
-      <x-icon :name="icon" :size="36" :color="icoColor(tone)" />
+      <x-icon :name="icon" :size="40" :color="icoColor(tone)" />
     </view>
     <view class="x-flex-1">
       <view class="xcl__t1 x-ellipsis">
@@ -73,7 +73,7 @@ function icoColor(tone: string) {
   display: flex;
   gap: 20rpx;
   align-items: center;
-  min-height: var(--h-cell);
+  min-height: var(--h-touch);
   padding: 22rpx 0;
   border-bottom: 2rpx solid var(--color-divider);
 }
@@ -87,8 +87,8 @@ function icoColor(tone: string) {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 72rpx;
-  height: 72rpx;
+  width: 80rpx;
+  height: 80rpx;
   border-radius: 24rpx;
 }
 

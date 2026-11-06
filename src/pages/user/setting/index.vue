@@ -7,9 +7,9 @@
       ☁️ 数据与同步
     </view>
     <x-card>
-      <x-field label="存储方式" value="本地优先" />
-      <x-field label="本地备份" :value="`上次 ${backupText}`" />
-      <x-field label="云同步" @click="handleCloud">
+      <x-field label="存储方式" value="本地优先" icon="database" />
+      <x-field label="本地备份" :value="`上次 ${backupText}`" icon="database-backup" />
+      <x-field label="云同步" icon="cloud-upload" @click="handleCloud">
         <view class="st-cloud">
           <x-tag type="orange">
             PRO
@@ -19,12 +19,12 @@
           </text>
         </view>
       </x-field>
-      <x-field label="从备份恢复" @click="goRestore">
+      <x-field label="从备份恢复" icon="refresh" @click="goRestore">
         <text class="st-link">
           预览后确认 ›
         </text>
       </x-field>
-      <x-field label="导出 CSV" last @click="handleExport">
+      <x-field label="导出 CSV" icon="data-export" last @click="handleExport">
         <text class="st-link">
           需二次认证 ›
         </text>
@@ -36,32 +36,32 @@
       🔐 隐私与权限
     </view>
     <x-card>
-      <x-field label="相机（拍照识别）" @click="requestCamera">
+      <x-field label="相机（拍照识别）" icon="camera" @click="requestCamera">
         <text :class="cameraClass">
           {{ cameraText }}
         </text>
       </x-field>
-      <x-field label="健康数据授权" @click="handleHealth">
+      <x-field label="健康数据授权" icon="heart-pulse" @click="handleHealth">
         <text class="st-ok">
           已授权 · 可撤回 ›
         </text>
       </x-field>
-      <x-field label="通知频控" @click="goFrequency">
+      <x-field label="通知频控" icon="bell-ring" @click="goFrequency">
         <text class="st-link">
           标准 · 约 3 条/天 ›
         </text>
       </x-field>
-      <x-field label="个人信息收集清单" @click="handleCollection">
+      <x-field label="个人信息收集清单" icon="file-text" @click="handleCollection">
         <text class="st-link">
           查看 ›
         </text>
       </x-field>
-      <x-field label="第三方共享清单" @click="handleThirdParty">
+      <x-field label="第三方共享清单" icon="share" @click="handleThirdParty">
         <text class="st-link">
           查看 ›
         </text>
       </x-field>
-      <x-field label="长辈模式" last>
+      <x-field label="长辈模式" icon="accessibility" last>
         <x-switch :checked="settingStore.isElder" @change="handleElder" />
       </x-field>
     </x-card>
@@ -80,6 +80,11 @@
           @click="setTheme(opt.value)"
         />
       </view>
+      <x-field label="设计规范 Design Tokens" icon="palette" last @click="goTokens">
+        <text class="st-link">
+          查看 ›
+        </text>
+      </x-field>
       <x-note>{{ themeHint }}</x-note>
     </x-card>
 
@@ -254,6 +259,15 @@ function handleThirdParty(): void {
 
 function handleElder(value: boolean): void {
   settingStore.setElder(value);
+  // 开启后进入长辈模式首页（原型 24）
+  if (value) {
+    uni.navigateTo({ url: '/pages/user/elder/index' });
+  }
+}
+
+// 设计规范参考页（原型 25 Design Tokens）
+function goTokens(): void {
+  uni.navigateTo({ url: '/pages/common/tokens/index' });
 }
 
 // 删除全部数据：清空物品（含回收站）+ 消息复位 + 本地备份与设置复位

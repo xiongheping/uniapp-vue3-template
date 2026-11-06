@@ -22,6 +22,11 @@ const PLAN_LIST_KEY = 'med_plan_list';
 /** 打卡记录持久化键 */
 const RECORD_MAP_KEY = 'med_record_map';
 
+/** 演示数据总开关：让用药页首次启动即呈现原型 11 的「2/3 已完成 + 昨日漏服」 */
+const DEMO_ENABLED = true;
+/** 演示数据已注入标记（只注入一次） */
+const SEED_KEY = 'med_demo_seeded';
+
 function nowId(prefix: string): string {
   return `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
 }
@@ -32,6 +37,81 @@ function hhmm(date = new Date()): string {
 
 function dayKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** N 天前的日期键（0 = 今天） */
+function dayKeyBefore(offset: number): string {
+  return dayKey(new Date(Date.now() - offset * 86400000));
+}
+
+/**
+ * 演示计划（严格对齐原型 11 / 11c / 12 / 13）
+ * 布洛芬缓释胶囊：08:00 早间 + 20:00 晚间，疗程 7 天（今天第 2 天），库存 16/20 粒
+ * 维生素 C：08:00 早间，与布洛芬同日同时段，构成本日 3 剂次
+ */
+const DEMO_PLANS: MedPlan[] = [
+  {
+    id: 'p-demo-1',
+    name: '布洛芬缓释胶囊',
+    spec: '0.3g × 20 粒',
+    approval: '国药准字H20013062',
+    type: 'ontime',
+    reason: '感冒发烧',
+    doses: [
+      { id: 'd1', time: '08:00', label: '早间', afterMeal: '早餐后', amount: '1 粒', advance: 10, enabled: true },
+      { id: 'd2', time: '20:00', label: '晚间', afterMeal: '晚餐后 30 分钟', amount: '1 粒', advance: 10, enabled: true },
+    ],
+    course: { total: 7, index: 2, autoStop: true },
+    stock: { have: 16, total: 20, unit: '粒' },
+    lowStockDays: 3,
+    visibility: 'self',
+    enabled: true,
+    instruction: {
+      usage: '口服。成人，一次 1 粒（0.3g），一日 2 次（早晚各一次）。',
+      caution: '不得超剂量服用。服药期间不得饮酒。孕妇及哺乳期妇女不宜使用。',
+      indications: '用于缓解轻至中度疼痛，如头痛、关节痛、偏头痛、牙痛、肌肉痛、神经痛、痛经；也用于普通感冒或流行性感冒引起的发热。',
+      contraindications: '对本品及其他解热镇痛药过敏者禁用。活动性消化道溃疡者禁用。',
+    },
+    createdAt: dayKeyBefore(1),
+  },
+  {
+    id: 'p-demo-2',
+    name: '维生素 C',
+    spec: '100mg × 60 片',
+    approval: '国药准字H31021027',
+    type: 'ontime',
+    doses: [
+      { id: 'd1', time: '08:00', label: '早间', afterMeal: '早餐后', amount: '1 片', advance: 10, enabled: true },
+    ],
+    course: { total: 30, index: 2, autoStop: true },
+    stock: { have: 24, total: 60, unit: '片' },
+    lowStockDays: 3,
+    visibility: 'self',
+    enabled: true,
+    instruction: {
+      usage: '口服。成人一日 1 片。',
+      caution: '不宜长期过量服用，过量可引起腹泻、皮疹等。',
+      indications: '用于预防坏血病，也可用于各种急慢性传染性疾病及紫癜等辅助治疗。',
+    },
+    createdAt: dayKeyBefore(1),
+  },
+];
+
+/**
+ * 演示打卡记录（对应原型 11）
+ * 今日：08:00 布洛芬 08:31 已服用（保留 5 分钟撤销窗口，还原「撤销」链接）、08:00 维生素 C 08:35 已服用、20:00 布洛芬待服用
+ * 昨日（疗程第 1 天）：08:00 两剂已完成，20:00 布洛芬漏服 → 首页红色「现在补登 / 跳过」
+ */
+function seedDemoRecords(): Record<string, DoseRecord> {
+  const todayStr = dayKey();
+  const yesterday = dayKeyBefore(1);
+  return {
+    [`p-demo-1:d1:${todayStr}`]: { status: 'taken', takenAt: '08:31', undoUntil: Date.now() + UNDO_MS },
+    [`p-demo-2:d1:${todayStr}`]: { status: 'taken', takenAt: '08:35' },
+    [`p-demo-1:d1:${yesterday}`]: { status: 'taken', takenAt: '08:20' },
+    [`p-demo-2:d1:${yesterday}`]: { status: 'taken', takenAt: '08:25' },
+    [`p-demo-1:d2:${yesterday}`]: { status: 'missed' },
+  };
 }
 
 /** 当前分钟数（0:00 起算） */
@@ -183,6 +263,25 @@ const useMedicineStore = defineStore('medicine', {
     },
   },
   actions: {
+    /**
+     * 首启动注入演示计划与打卡记录（原型 11 今日用药时间轴）
+     * 只注入一次：SEED_KEY 写入后，即使用户删光计划也不会再次生成
+     */
+    ensureSeedDemo() {
+      if (!DEMO_ENABLED || storage.get(SEED_KEY) === '1') {
+        return;
+      }
+      storage.set(SEED_KEY, '1');
+      if (this.plans.length > 0) {
+        return;
+      }
+      // 深拷贝，避免编辑计划时改到模块级常量
+      this.plans = JSON.parse(JSON.stringify(DEMO_PLANS)) as MedPlan[];
+      this.records = seedDemoRecords();
+      this.persistPlans();
+      this.persistRecords();
+    },
+
     persistPlans() {
       storage.setJSON(PLAN_LIST_KEY, this.plans);
     },

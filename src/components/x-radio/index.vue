@@ -21,8 +21,9 @@ withDefaults(defineProps<Props>(), { checked: false });
   justify-content: center;
   width: 44rpx;
   height: 44rpx;
-  border: 4rpx solid var(--color-fill);
+  border: 4rpx solid var(--color-switch-off);
   border-radius: 50%;
+  transition: border-color var(--dur-normal) var(--ease-out);
 }
 
 .xr--on {
@@ -34,6 +35,7 @@ withDefaults(defineProps<Props>(), { checked: false });
     content: '';
     background: var(--color-primary);
     border-radius: 50%;
+    animation: x-fade-up 0.18s var(--ease-out);
   }
 }
 </style>

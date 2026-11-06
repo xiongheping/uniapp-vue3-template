@@ -1,5 +1,5 @@
 <template>
-  <view v-if="show" class="xtp__mask" @tap="onCancel">
+  <view v-show="show" class="xtp__mask" @tap="onCancel">
     <view class="xtp" @tap.stop>
       <view class="xtp__handle" />
       <view class="xtp__title">

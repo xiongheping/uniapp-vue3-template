@@ -26,6 +26,8 @@ page {
   // 边框
   --color-border: #e4e8f0;
   --color-divider: #f2f4f8;
+  // TabBar 顶边线（原型 .tabbar border-top:#EEF0F5，非分割线 #F2F4F8）
+  --color-tabbar-border: #eef0f5;
 
   // 语义色
   --color-danger: #d93025;
@@ -46,6 +48,25 @@ page {
   --color-note-purple-text: #4a2e8c;
   --color-note-purple-bar: #7b3ff2;
 
+  // 组件别名（与原型的 tag / chip / 选中态色板一一对应）
+  --color-primary-light: #e6edff;
+  --color-primary-bg: #e6edff;
+  --color-primary-mist: #f7f9ff;
+  --color-danger-light: #ffe5e5;
+  --color-warning-light: #fff0db;
+  --color-success-light: #e4f5e4;
+  --color-danger-tag-bg: #ffe5e5;
+  --color-warning-tag-bg: #fff0db;
+  --color-success-tag-bg: #e4f5e4;
+  --color-warning: #c77700;
+  --color-danger-line: #fbcbcb;
+  --color-disabled-bg: #d9dee8;
+  --color-switch-off: #d9dee8;
+  --color-icon-off: #c0c6d2;
+  --color-purple: #7b3ff2;
+  --color-note-border: #ffb020;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
   // 字号
   --fs-h1: 44rpx;
   --fs-title: 34rpx;
@@ -54,6 +75,13 @@ page {
   --fs-sub: 24rpx;
   --fs-caption: 22rpx;
   --fs-mini: 20rpx;
+  // 数字大字（原型 .tile .n 20px）
+  --fs-num: 40rpx;
+  // 按钮字号（原型 .btn 15px；large 17px；.elder .btn 19px）
+  --fs-btn: 30rpx;
+  --fs-btn-lg: 34rpx;
+  // 底部导航字号（原型 .tab 10px；.elder .tab 13px）
+  --fs-tab: 20rpx;
 
   // 圆角
   --radius-card: 32rpx;
@@ -67,6 +95,45 @@ page {
   // 触控热区
   --h-cell: 88rpx;
   --h-touch: 96rpx;
+  --h-icon: 80rpx;
+  // 按钮高度（原型 .btn min-height:48px；large 56px；.elder .btn 60px）
+  --h-btn: 96rpx;
+  --h-btn-lg: 112rpx;
+  // 自定义 tabBar 总高（原型 .tabbar height:78px；elder 88px）
+  --h-tabbar: 156rpx;
+
+  // —— WeUI 对齐层（微信小程序官方设计规范）——
+  // 字体栈（WeUI 标准，中英混排优先 PingFang/雅黑）
+  --font-family: -apple-system, blinkmacsystemfont, 'Helvetica Neue', helvetica, 'Segoe UI', arial, roboto, 'PingFang SC', 'miui', 'Hiragino Sans GB', 'Microsoft Yahei', sans-serif;
+
+  // 字重层级
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  // 行高节奏：标题紧凑 / 正文常规 / 长文宽松
+  --lh-tight: 1.25;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.75;
+
+  // 间距节奏（4px 基准网格，1px = 2rpx）
+  --space-1: 8rpx;
+  --space-2: 16rpx;
+  --space-3: 24rpx;
+  --space-4: 32rpx;
+  --space-5: 48rpx;
+  --space-6: 64rpx;
+
+  // 按压反馈（WeUI 惯例：浅灰叠加，不变形为主）
+  --color-press: rgb(0 0 0 / 5%);
+  --color-press-strong: rgb(0 0 0 / 8%);
+  --color-link: #576b95;
+
+  // 过渡节奏
+  --dur-fast: 0.12s;
+  --dur-normal: 0.2s;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /**
@@ -83,6 +150,8 @@ page {
   --color-fill-light: #22262f;
   --color-border: #2a2f3a;
   --color-divider: #2a2f3a;
+  // 暗色 TabBar 顶边线（原型 .dark .tabbar border-top-color:#2A2F3A）
+  --color-tabbar-border: #2a2f3a;
   --color-primary-soft: #223055;
   --color-note-bg: #2a2418;
   --color-note-text: #e8c97a;
@@ -95,10 +164,31 @@ page {
   --color-note-purple-bg: #241d3a;
   --color-note-purple-text: #c9b0ff;
   --shadow-card: 0 2rpx 6rpx rgb(0 0 0 / 40%);
+
+  // 组件别名（暗黑，原型 23）
+  --color-primary-light: #223055;
+  --color-primary-bg: #223055;
+  --color-primary-mist: #1a2440;
+  --color-danger-light: #3a1d1d;
+  --color-warning-light: #2a2418;
+  --color-success-light: #1c2e1c;
+  --color-danger-tag-bg: #3a1d1d;
+  --color-warning-tag-bg: #2a2418;
+  --color-success-tag-bg: #1c2e1c;
+  --color-warning: #e8c97a;
+  --color-danger-line: #5a2a2a;
+  --color-disabled-bg: #2a2f3a;
+  --color-switch-off: #3a4150;
+  --color-icon-off: #5a6275;
+  --color-purple: #c9b0ff;
+  --color-press: rgb(255 255 255 / 8%);
+  --color-press-strong: rgb(255 255 255 / 12%);
+  --color-link: #8fb0ff;
 }
 
 /**
  * 长辈模式（原型 24）：辅助文字 16px 起，按钮加大
+ * 令牌依据原型 .elder 覆盖规则：.btn{19px;min-height:60px}、.tab{13px}、.tab-ico{28px}、tabbar{height:88px}
  */
 .xp-root.elder {
   --fs-h1: 44rpx;
@@ -108,11 +198,97 @@ page {
   --fs-sub: 32rpx;
   --fs-caption: 30rpx;
   --fs-mini: 28rpx;
+  --fs-btn: 38rpx;
+  --fs-tab: 26rpx;
   --h-cell: 108rpx;
   --h-touch: 116rpx;
+  --h-btn: 120rpx;
+  --h-btn-lg: 120rpx;
+  --h-tabbar: 176rpx;
 }
 
 /* ========== 通用工具类 ========== */
+
+/* 全局字体（WeUI 字体栈）与正文行高 */
+page {
+  font-family: var(--font-family);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 数字等宽（统计 / 倒计时 / 库存，WeUI 数字排版） */
+.x-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * 按压态（uni hover-class 机制，H5/小程序通用）
+ * 用法：class="x-tap" hover-class="x-tap--hover"
+ * 三档反馈：背景变灰（列表）/ 微缩放（卡片·按钮）/ 透明度（图标·文字链）
+ */
+.x-tap {
+  transition:
+    background-color var(--dur-normal) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-normal) var(--ease-out);
+}
+
+.x-tap--hover {
+  background-color: var(--color-press);
+}
+
+/* 仅背景过渡（带左滑/拖拽的行，避免 transform 过渡干扰手势） */
+.x-tap-bg {
+  transition: background-color var(--dur-normal) var(--ease-out);
+}
+
+.x-tap-scale {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-normal) var(--ease-out);
+}
+
+.x-tap-scale--hover {
+  opacity: 0.88;
+  transform: scale(0.97);
+}
+
+.x-tap-opacity {
+  transition: opacity var(--dur-normal) var(--ease-out);
+}
+
+.x-tap-opacity--hover {
+  opacity: 0.55;
+}
+
+/* 彩色底上的按压（白色叠加，FAB / 渐变卡 / 主色按钮） */
+.x-tap-on-color {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-normal) var(--ease-out);
+}
+
+.x-tap-on-color--hover {
+  opacity: 0.9;
+  transform: scale(0.96);
+}
+
+/* 折叠/展开内容淡入（配合 v-if 使用，轻量小程序动效） */
+@keyframes x-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(-8rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.x-expand {
+  animation: x-fade-up 0.22s var(--ease-out);
+}
 
 .x-flex-1 {
   flex: 1;

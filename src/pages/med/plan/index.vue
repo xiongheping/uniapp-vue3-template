@@ -11,29 +11,55 @@
       <text class="mp-b mp-danger">
         删除计划
       </text>
-      （需二次确认）。
+      （红色 · 需二次确认）。
     </x-note>
 
-    <!-- 基本信息 -->
+    <!-- 基本信息（原型 11c：💊 药名 · 说明书 › / 服药类型） -->
     <x-card>
       <x-field label="💊 药品名称">
-        <input v-model="form.name" class="mp-input" placeholder="填写药品名称">
+        <view class="mp-inline">
+          <input v-model="form.name" class="mp-input mp-input--flex" placeholder="填写药品名称">
+          <text class="mp-link" @click="gotoLeaflet">
+            📄 说明书 ›
+          </text>
+        </view>
       </x-field>
-      <x-field label="📄 说明书" value="查看摘录 ›" tone="primary" chevron @click="gotoLeaflet" />
+      <x-field label="服药类型" last>
+        <view class="mp-chips">
+          <x-chip small text="⏰ 按时" :active="form.type === 'ontime'" @click="form.type = 'ontime'" />
+          <x-chip small text="⚖️ 按需" :active="form.type === 'prn'" @click="form.type = 'prn'" />
+        </view>
+      </x-field>
+    </x-card>
+
+    <!-- 附加字段：原型不占首屏，收进折叠区 -->
+    <view class="mp-more x-tap" hover-class="x-tap--hover" :hover-start-time="0" @tap="showMoreInfo = !showMoreInfo">
+      <text>更多信息（规格 / 批准文号 / 用药原因）</text>
+      <text class="mp-more__act">
+        {{ showMoreInfo ? "收起 ▴" : "展开 ▾" }}
+      </text>
+    </view>
+    <x-card v-show="showMoreInfo" class="x-expand">
       <x-field label="规格">
         <input v-model="form.spec" class="mp-input" placeholder="如 0.3g × 20 粒">
       </x-field>
       <x-field label="批准文号">
         <input v-model="form.approval" class="mp-input" placeholder="国药准字…">
       </x-field>
-      <x-field label="服药类型">
-        <view class="mp-chips">
-          <x-chip small text="⏰ 按时" :active="form.type === 'ontime'" @click="form.type = 'ontime'" />
-          <x-chip small text="⚖️ 按需" :active="form.type === 'prn'" @click="form.type = 'prn'" />
-        </view>
-      </x-field>
-      <x-field label="用药原因" last>
+      <x-field label="用药原因">
         <input v-model="form.reason" class="mp-input" placeholder="如 感冒发烧 / 日常补充">
+      </x-field>
+      <x-field label="库存单位" last>
+        <view class="mp-chips">
+          <x-chip
+            v-for="item in unitOptions"
+            :key="item"
+            small
+            :text="item"
+            :active="form.stock.unit === item"
+            @click="form.stock.unit = item"
+          />
+        </view>
       </x-field>
     </x-card>
 
@@ -115,36 +141,41 @@
       </x-card>
     </template>
 
-    <!-- 疗程 · 库存 · 隐私 -->
+    <!-- 疗程 · 库存 · 隐私（原型 11c：4 行摘要 + › 展开编辑） -->
     <view class="x-section-title">
       疗程与库存
     </view>
     <x-card>
-      <x-field label="疗程天数">
-        <input v-model="form.course.total" type="number" class="mp-input" placeholder="7">
-      </x-field>
-      <picker mode="date" :value="form.course.start" @change="(e: any) => onDateChange('start', e)">
-        <x-field
-          label="开始日期"
-          :value="form.course.start || '选择日期'"
-          :tone="form.course.start ? 'primary' : ''"
-          chevron
-        />
-      </picker>
-      <picker mode="date" :value="form.course.end" @change="(e: any) => onDateChange('end', e)">
-        <x-field
-          label="结束日期"
-          :value="form.course.end || '选择日期'"
-          :tone="form.course.end ? 'primary' : ''"
-          chevron
-        />
-      </picker>
-      <x-field label="结束自动停提醒" last>
-        <x-switch :checked="form.course.autoStop !== false" @change="(value: boolean) => (form.course.autoStop = value)" />
-      </x-field>
-    </x-card>
-
-    <x-card>
+      <x-field
+        label="疗程"
+        :value="`${form.course.total || 0} 天 · 结束自动停提醒`"
+        chevron
+        @click="courseOpen = !courseOpen"
+      />
+      <template v-if="courseOpen">
+        <x-field label="疗程天数">
+          <input v-model="form.course.total" type="number" class="mp-input" placeholder="7">
+        </x-field>
+        <picker mode="date" :value="form.course.start" @change="(e: any) => onDateChange('start', e)">
+          <x-field
+            label="开始日期"
+            :value="form.course.start || '选择日期'"
+            :tone="form.course.start ? 'primary' : ''"
+            chevron
+          />
+        </picker>
+        <picker mode="date" :value="form.course.end" @change="(e: any) => onDateChange('end', e)">
+          <x-field
+            label="结束日期"
+            :value="form.course.end || '选择日期'"
+            :tone="form.course.end ? 'primary' : ''"
+            chevron
+          />
+        </picker>
+        <x-field label="结束自动停提醒" last>
+          <x-switch :checked="form.course.autoStop !== false" @change="(value: boolean) => (form.course.autoStop = value)" />
+        </x-field>
+      </template>
       <x-field label="📦 库存">
         <x-quantity
           :text="`${form.stock.have}/${form.stock.total} ${form.stock.unit}`"
@@ -152,36 +183,31 @@
           @increase="changeStock(1)"
         />
       </x-field>
-      <x-field label="库存单位">
-        <view class="mp-chips">
-          <x-chip
-            v-for="item in unitOptions"
-            :key="item"
-            small
-            :text="item"
-            :active="form.stock.unit === item"
-            @click="form.stock.unit = item"
-          />
-        </view>
+      <x-field
+        label="药量不足提醒"
+        :value="`≤ ${form.lowStockDays} 天用量时`"
+        chevron
+        @click="lowOpen = !lowOpen"
+      />
+      <view v-if="lowOpen" class="mp-chips mp-chips--left">
+        <x-chip
+          v-for="item in lowOptions"
+          :key="item"
+          small
+          :text="`≤ ${item} 天`"
+          :active="Number(form.lowStockDays) === item"
+          @click="form.lowStockDays = item"
+        />
+      </view>
+      <x-field label="可见范围" last>
+        <text class="mp-vis" @click="visOpen = !visOpen">
+          🔒 {{ form.visibility === 'family' ? '家人可见' : '仅自己' }} ›
+        </text>
       </x-field>
-      <x-field label="药量不足提醒">
-        <view class="mp-chips">
-          <x-chip
-            v-for="item in lowOptions"
-            :key="item"
-            small
-            :text="`≤ ${item} 天`"
-            :active="Number(form.lowStockDays) === item"
-            @click="form.lowStockDays = item"
-          />
-        </view>
-      </x-field>
-      <x-field label="🔒 可见范围" last>
-        <view class="mp-chips">
-          <x-chip small text="仅自己" :active="form.visibility === 'self'" @click="form.visibility = 'self'" />
-          <x-chip small text="👥 家人可见" :active="form.visibility === 'family'" @click="form.visibility = 'family'" />
-        </view>
-      </x-field>
+      <view v-if="visOpen" class="mp-chips mp-chips--left">
+        <x-chip small text="仅自己" :active="form.visibility === 'self'" @click="form.visibility = 'self'" />
+        <x-chip small text="👥 家人可见" :active="form.visibility === 'family'" @click="form.visibility = 'family'" />
+      </view>
     </x-card>
 
     <x-card>
@@ -355,6 +381,12 @@ function createForm(): PlanForm {
 }
 
 const form = reactive<PlanForm>(createForm());
+
+/** 附加字段折叠（原型 11c 首屏只保留药名 / 说明书 / 服药类型） */
+const showMoreInfo = ref<boolean>(false);
+const courseOpen = ref<boolean>(false);
+const lowOpen = ref<boolean>(false);
+const visOpen = ref<boolean>(false);
 
 const timePicker = reactive<{ show: boolean; value: string; index: number }>({ show: false, value: '08:00', index: -1 });
 
@@ -667,6 +699,26 @@ onLoad(async (options: Record<string, string> = {}) => {
 </script>
 
 <style lang="scss" scoped>
+/* 附加字段折叠入口 */
+.mp-more {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 8rpx 20rpx 16rpx;
+  font-size: var(--fs-caption);
+  color: var(--color-text-sub);
+
+  &:active {
+    opacity: 0.7;
+  }
+}
+
+.mp-more__act {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
 .mp-b {
   font-weight: 700;
 }
@@ -680,6 +732,25 @@ onLoad(async (options: Record<string, string> = {}) => {
   font-size: var(--fs-sub);
   color: var(--color-text);
   text-align: right;
+}
+
+/* 药名 + 说明书 › 并排（原型 11c 第一行） */
+.mp-inline {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.mp-input--flex {
+  width: 240rpx;
+}
+
+.mp-link {
+  flex-shrink: 0;
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  color: var(--color-primary);
 }
 
 .mp-textarea {
@@ -701,6 +772,20 @@ onLoad(async (options: Record<string, string> = {}) => {
   gap: 12rpx;
   justify-content: flex-end;
   max-width: 440rpx;
+}
+
+/* 展开编辑行：chip 靠左 */
+.mp-chips--left {
+  justify-content: flex-start;
+  max-width: none;
+  padding: 4rpx 0 20rpx;
+}
+
+/* 可见范围值（原型 11c：紫色 🔒 仅自己 ›） */
+.mp-vis {
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  color: #7b3ff2;
 }
 
 .mp-block {

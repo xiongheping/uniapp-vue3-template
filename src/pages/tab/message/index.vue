@@ -17,7 +17,7 @@
       <x-group-bar :title="`🚨 必达 · 服药 ${mustList.length}`" />
       <view v-for="msg in mustList" :key="msg.id" class="msg-must" :class="{ 'is-read': msg.read }">
         <view class="msg-must__tap" hover-class="msg-must__tap--hover" @tap="openMessage(msg)">
-          <x-icon :name="msg.icon || 'pill'" :size="44" color="#4F7CFF" />
+          <x-icon :name="msg.icon || 'pill'" :size="48" color="#4F7CFF" />
           <view class="x-flex-1">
             <view class="msg-row__t1">
               <text>{{ msg.title }}</text>
@@ -36,6 +36,7 @@
           <x-button
             type="ghost"
             small
+            class="msg-snooze"
             :disabled="snoozeBlocked(msg)"
             :text="snoozeText(msg)"
             @click="quickSnooze(msg)"
@@ -44,31 +45,42 @@
       </view>
     </template>
 
-    <!-- P1 今日摘要 -->
+    <!-- P1 今日摘要：可左滑（已读 / 删除），与原型 14 一致 -->
     <template v-if="digestList.length">
-      <x-group-bar :title="`📬 今日摘要 · ${digestList.length}`" more="长按可标已读 / 删除" />
-      <view
-        v-for="msg in digestList"
-        :key="msg.id"
-        class="msg-item"
-        :class="{ 'msg-item--head': !msg.swipeable }"
-        hover-class="msg-item--hover"
-        @tap="openMessage(msg)"
-        @longpress="handleLongPress(msg)"
-      >
-        <x-icon :name="msg.icon || 'package'" :size="40" :color="iconColor(msg)" />
-        <view class="x-flex-1">
-          <view class="msg-row__t1">
-            <text>{{ msg.title }}</text>
-            <text v-if="!msg.read" class="msg-dot" />
+      <x-group-bar title="📬 今日摘要 · 可左滑 · 点卡片查看" />
+      <view v-for="msg in digestList" :key="msg.id" class="msg-swipe">
+        <view class="msg-swipe__actions">
+          <view class="msg-swipe__read" @tap.stop="handleRead(msg)">
+            已读
           </view>
-          <view class="msg-row__t2">
-            {{ msg.sub }}
+          <view class="msg-swipe__del" @tap.stop="handleRemove(msg)">
+            删除
           </view>
         </view>
-        <x-tag :type="msg.level === 'P1' ? 'orange' : 'green'">
-          {{ msg.level }}
-        </x-tag>
+        <view
+          class="msg-item"
+          :class="{ 'msg-item--head': !msg.swipeable }"
+          :style="{ transform: `translateX(${offsetOf(msg.id)}px)` }"
+          hover-class="msg-item--hover"
+          @touchstart="onTouchStart($event, msg.id)"
+          @touchmove="onTouchMove"
+          @touchend="onTouchEnd(msg)"
+          @tap="openMessage(msg)"
+        >
+          <x-icon :name="msg.icon || 'package'" :size="40" :color="iconColor(msg)" />
+          <view class="x-flex-1">
+            <view class="msg-row__t1">
+              <text>{{ msg.title }}</text>
+              <text v-if="!msg.read" class="msg-dot" />
+            </view>
+            <view class="msg-row__t2">
+              {{ msg.sub }}
+            </view>
+          </view>
+          <x-tag :type="msg.level === 'P1' ? 'orange' : 'green'">
+            {{ msg.level }}
+          </x-tag>
+        </view>
       </view>
     </template>
 
@@ -102,7 +114,7 @@
     <x-empty v-if="!list.length" emoji="📭" title="消息已清空" sub="P0 服药提醒会第一时间出现在这里" />
 
     <x-note type="blue">
-      👆 P0 必达通知不可被滑动消除；点击卡片进入打卡页，状态与用药 Tab 实时同步。摘要与历史条目长按可标已读或删除。
+      👆 P0 必达通知无左滑，不可被滑动消除；点击卡片进入打卡页，状态与用药 Tab 实时同步。
     </x-note>
 
     <view class="msg-entry">
@@ -235,6 +247,52 @@ function quickSnooze(msg: MessageRecord) {
   });
 }
 
+/* —— 摘要行左滑：已读 / 删除（原型 14 标注「可左滑」） —— */
+const swipeOffsets = ref<Record<string, number>>({});
+let touchStartX = 0;
+let touchStartY = 0;
+let swipeMsgId = '';
+
+function offsetOf(id: string): number {
+  return swipeOffsets.value[id] || 0;
+}
+
+function onTouchStart(e: TouchEvent, id: string) {
+  touchStartX = e.touches[0]?.clientX || 0;
+  touchStartY = e.touches[0]?.clientY || 0;
+  swipeMsgId = id;
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (!swipeMsgId) {
+    return;
+  }
+  const dx = (e.touches[0]?.clientX || 0) - touchStartX;
+  const dy = (e.touches[0]?.clientY || 0) - touchStartY;
+  if (Math.abs(dx) < Math.abs(dy)) {
+    return;
+  }
+  swipeOffsets.value[swipeMsgId] = Math.max(-160, Math.min(0, dx));
+}
+
+function onTouchEnd(msg: MessageRecord) {
+  const offset = swipeOffsets.value[swipeMsgId] || 0;
+  swipeOffsets.value[msg.id] = offset < -40 ? -160 : 0;
+  swipeMsgId = '';
+}
+
+function handleRead(msg: MessageRecord) {
+  messageStore.markRead(msg.id);
+  swipeOffsets.value[msg.id] = 0;
+  uni.showToast({ title: '已标为已读', icon: 'none' });
+}
+
+function handleRemove(msg: MessageRecord) {
+  swipeOffsets.value[msg.id] = 0;
+  messageStore.remove(msg.id);
+  uni.showToast({ title: '已删除', icon: 'none' });
+}
+
 function handleLongPress(msg: MessageRecord) {
   const actions = msg.read ? ['删除'] : ['标为已读', '删除'];
   uni.showActionSheet({
@@ -323,7 +381,7 @@ onShow(async () => {
 
 .msg-row__t2 {
   margin-top: 4rpx;
-  font-size: var(--fs-caption);
+  font-size: var(--fs-sub);
   line-height: 1.5;
   color: var(--color-text-sub);
 }
@@ -334,11 +392,11 @@ onShow(async () => {
   color: var(--color-text-mute);
 }
 
-/* P0 卡：去阴影只留左条 */
+/* P0 卡：去阴影只留左条（原型 14：#F7F9FF + 4px 左条） */
 .msg-must {
   padding: 28rpx;
   margin-bottom: 24rpx;
-  background: var(--color-primary-bg);
+  background: var(--color-primary-mist);
   border-left: 8rpx solid var(--color-primary);
   border-radius: 24rpx;
 }
@@ -347,6 +405,7 @@ onShow(async () => {
   display: flex;
   gap: 16rpx;
   align-items: flex-start;
+  transition: opacity var(--dur-normal) var(--ease-out);
 }
 
 .msg-must__tap--hover {
@@ -361,15 +420,70 @@ onShow(async () => {
   margin-top: 16rpx;
 }
 
+/* 「稍后15分」弱化 ghost（原型 14：#8A93A5 / #E4E8F0） */
+.msg-must__btns :deep(.msg-snooze.x-button--ghost) {
+  color: #8a93a5;
+  border-color: #e4e8f0;
+}
+
 .msg-item {
+  position: relative;
+  z-index: 1;
   display: flex;
-  gap: 16rpx;
+  gap: 20rpx;
   align-items: center;
-  padding: 24rpx 28rpx;
+  padding: 24rpx;
   margin-bottom: 20rpx;
   background: var(--color-card);
-  border-radius: 24rpx;
+  border-radius: 32rpx;
   box-shadow: var(--shadow-card);
+  transition: transform 0.16s ease;
+}
+
+/* 左滑容器内：间距由 .msg-swipe 提供（原型 .swipe margin-bottom 8px） */
+.msg-swipe .msg-item {
+  margin-bottom: 0;
+  border-radius: 24rpx;
+  box-shadow: none;
+}
+
+/* 左滑容器：操作区在卡片下方 */
+/* 原型 .swipe：12px 圆角、操作块 64px 宽、11px 字 */
+.msg-swipe {
+  position: relative;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+  border-radius: 24rpx;
+}
+
+.msg-swipe__actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 16rpx;
+  z-index: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: 0 24rpx 24rpx 0;
+}
+
+.msg-swipe__read,
+.msg-swipe__del {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 128rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.msg-swipe__read {
+  background: #4f7cff;
+}
+
+.msg-swipe__del {
+  background: #fa5151;
 }
 
 .msg-item--hover {

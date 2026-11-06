@@ -31,14 +31,14 @@
         {{ phoneErr }}
       </text>
 
-      <view class="lg-btn lg-btn--main" :class="{ 'lg-btn--disabled': !phoneOk }" @tap="getCode">
+      <view class="lg-btn lg-btn--main x-tap-scale" :class="{ 'lg-btn--disabled': !phoneOk }" hover-class="x-tap-scale--hover" :hover-start-time="0" @tap="getCode">
         {{ codeSent ? '重新获取验证码' : '获取验证码' }}
       </view>
 
       <!-- 协议：默认无错，交互后提示 -->
       <view class="lg-protocol" :class="{ 'lg-protocol--err': protocolErr }" @tap="agree = !agree">
         <view class="lg-cb" :class="{ 'lg-cb--on': agree, 'lg-cb--err': protocolErr }">
-          <x-icon v-if="agree" name="check" :size="12" color="#fff" />
+          <x-icon v-if="agree" name="check" :size="24" color="#fff" />
         </view>
         <text class="lg-protocol__text">
           我已阅读并同意 <text class="lg-protocol__link">
@@ -54,8 +54,8 @@
         请先阅读并勾选协议
       </text>
 
-      <view class="lg-btn lg-btn--ghost" @tap="oneClickLogin">
-        <x-icon name="phone" :size="16" />
+      <view class="lg-btn lg-btn--ghost x-tap-scale" hover-class="x-tap-scale--hover" :hover-start-time="0" @tap="oneClickLogin">
+        <x-icon name="phone" :size="32" />
         <text>本机号码一键登录</text>
       </view>
 
@@ -68,19 +68,17 @@
       </view>
 
       <view class="lg-social">
-        <view class="lg-social__item" @tap="socialLogin('wechat')">
-          <text class="lg-social__icon" style="color:#07C160">
-            💬
-          </text>
+        <view class="lg-social__item x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="socialLogin('wechat')">
+          <x-icon name="wechat" :size="36" color="#07C160" />
           <text>微信登录</text>
         </view>
-        <view class="lg-social__item" @tap="socialLogin('apple')">
-          <text class="lg-social__icon" />
+        <view class="lg-social__item x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="socialLogin('apple')">
+          <x-icon name="apple" :size="36" />
           <text>Apple 登录</text>
         </view>
       </view>
 
-      <view class="lg-guest" @tap="showGuest = true">
+      <view class="lg-guest x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="showGuest = true">
         <text class="lg-guest__link">
           先逛逛 ›
         </text>
@@ -133,10 +131,10 @@
         </text>
       </view>
 
-      <view class="lg-btn lg-btn--main" :class="{ 'lg-btn--disabled': codeStr.length < 6 }" @tap="verifyLogin">
+      <view class="lg-btn lg-btn--main x-tap-scale" :class="{ 'lg-btn--disabled': codeStr.length < 6 }" hover-class="x-tap-scale--hover" :hover-start-time="0" @tap="verifyLogin">
         验证并登录
       </view>
-      <view class="lg-btn lg-btn--ghost" @tap="backToPhone">
+      <view class="lg-btn lg-btn--ghost x-tap-scale" hover-class="x-tap-scale--hover" :hover-start-time="0" @tap="backToPhone">
         更换手机号
       </view>
     </template>
@@ -146,7 +144,7 @@
       <view class="x-card lg-guest-card">
         <view v-for="row in guestRows" :key="row.k" class="lg-guest-row">
           <view class="lg-guest-row__k">
-            <x-icon :name="row.ok ? 'check' : 'x'" :size="16" :color="row.ok ? '#2E7D32' : '#C0C6D2'" />
+            <x-icon :name="row.ok ? 'check' : 'x'" :size="32" :color="row.ok ? '#2E7D32' : '#C0C6D2'" />
             <text>{{ row.k }}</text>
           </view>
           <text class="lg-guest-row__v">
@@ -154,13 +152,13 @@
           </text>
         </view>
       </view>
-      <x-note tone="blue">
+      <x-note type="blue">
         💡 登录时若本机已有游客数据，会询问：合并去重 / 以云端为准 / 以本机为准。
       </x-note>
-      <view class="lg-btn lg-btn--main" @tap="continueGuest">
+      <view class="lg-btn lg-btn--main x-tap-scale" hover-class="x-tap-scale--hover" :hover-start-time="0" @tap="continueGuest">
         继续以游客身份使用
       </view>
-      <view class="lg-btn lg-btn--ghost" @tap="showGuest = false">
+      <view class="lg-btn lg-btn--ghost x-tap-scale" hover-class="x-tap-scale--hover" :hover-start-time="0" @tap="showGuest = false">
         返回登录
       </view>
     </x-sheet>
@@ -241,7 +239,7 @@ function getCode() {
     uni.showToast({ title: '请先阅读并同意协议', icon: 'none' });
     return;
   }
-  phoneErr.value = '';
+  phoneErr.value = '13971872913';
   protocolErr.value = false;
   codeSent.value = true;
   startCountdown();

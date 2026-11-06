@@ -1,5 +1,5 @@
 <template>
-  <view v-if="show" class="xsh__mask" :class="{ 'xsh__mask--center': mode === 'center' }" @tap="onMask">
+  <view v-show="show" class="xsh__mask" :class="{ 'xsh__mask--center': mode === 'center' }" @tap="onMask">
     <view class="xsh" :class="{ 'xsh--center': mode === 'center' }" @tap.stop>
       <view v-if="mode !== 'center'" class="xsh__handle" />
       <view v-if="title" class="xsh__title">
@@ -57,12 +57,10 @@ function onMask() {
 watch(
   () => props.show,
   (v) => {
-    if (v) {
-      // 弹层期间禁用页面滚动穿透
-      // #ifdef H5
-      document.body.style.overflow = 'hidden';
-      // #endif
-    }
+    // 弹层期间禁用页面滚动穿透，关闭后恢复（v-show 常驻 DOM，必须成对还原）
+    // #ifdef H5
+    document.body.style.overflow = v ? 'hidden' : '';
+    // #endif
   },
 );
 </script>

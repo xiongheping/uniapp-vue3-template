@@ -8,12 +8,12 @@
     <x-sheet :show="true" title="添加物品" @close="onCancel">
       <view v-for="(m, idx) in sheetList" :key="m.key" class="add-opt" :class="{ off: m.off }" @click="onPick(m)">
         <view class="add-opt__ico" :class="{ primary: idx === 0 && !m.off }">
-          <x-icon :name="m.icon" :size="44" :color="idx === 0 && !m.off ? '#FFFFFF' : '#4F7CFF'" />
+          <x-icon :name="m.icon" :size="48" :color="idx === 0 && !m.off ? '#FFFFFF' : '#4F7CFF'" />
         </view>
         <view class="x-flex-1">
           <view class="add-opt__title">
             <text>{{ m.title }}</text>
-            <x-tag v-if="m.badge" :type="m.badgeType || 'blue'" mini>
+            <x-tag v-if="m.badge" :type="m.badgeType || 'blue'" class="add-opt__badge">
               {{ m.badge }}
             </x-tag>
           </view>
@@ -21,7 +21,7 @@
             {{ m.sub }}
           </view>
         </view>
-        <x-icon v-if="!m.off" name="chev-r" :size="32" color="#C0C6D2" />
+        <x-icon v-if="!m.off" name="chev-r" :size="36" color="#C0C6D2" />
       </view>
       <x-button type="link" text="取消" @click="onCancel" />
     </x-sheet>
@@ -83,7 +83,7 @@
         <text class="saved__b">
           {{ continueCount }}
         </text>
-        件{{ continueCount >= 3 ? '，先休息一下也完全可以，随时回来继续。' : '，第 3 件后会出现温和休息提示。' }}
+        件{{ continueCount >= 3 ? '，先休息一下也完全可以，随时回来继续。' : '，第 3 件后会出现温和休息提示（主 CTA 不变）。' }}
       </x-note>
     </view>
 
@@ -94,7 +94,7 @@
           适合一次整理多件 · 主出口跟随上次方式
         </text>
         <x-button type="ghost" small :icon="secCta.icon" :text="secCta.text" @click="onContinue(secCta.key)" />
-        <x-button type="link" text="完成，回到首页" @click="goHome" />
+        <x-button type="link" text="完成，回到首页" class="saved-sticky__done" @click="goHome" />
       </view>
     </template>
   </x-page>
@@ -263,17 +263,23 @@ onLoad((options: any = {}) => {
   padding-right: 16rpx;
 }
 
+/* 08 无边框选项行 + 按下态（原型 .opt-row） */
 .add-opt {
   box-sizing: border-box;
   display: flex;
-  gap: 20rpx;
+  gap: 24rpx;
   align-items: center;
-  min-height: var(--h-touch);
-  padding: 24rpx 0;
-  border-bottom: 2rpx solid var(--color-divider);
+  min-height: 128rpx;
+  padding: 28rpx 20rpx;
+  border-radius: 28rpx;
+
+  &:active {
+    background: #f5f7fb;
+  }
 }
 
 .add-opt.off {
+  pointer-events: none;
   opacity: 0.5;
 }
 
@@ -282,10 +288,10 @@ onLoad((options: any = {}) => {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 84rpx;
-  height: 84rpx;
+  width: 92rpx;
+  height: 92rpx;
   background: var(--color-primary-soft);
-  border-radius: 24rpx;
+  border-radius: 28rpx;
 }
 
 .add-opt__ico.primary {
@@ -294,17 +300,23 @@ onLoad((options: any = {}) => {
 
 .add-opt__title {
   display: flex;
-  gap: 12rpx;
+  gap: 8rpx;
   align-items: center;
-  font-size: var(--fs-body);
+  font-size: 30rpx;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .add-opt__sub {
-  margin-top: 4rpx;
+  margin-top: 6rpx;
   font-size: var(--fs-sub);
   color: var(--color-text-sub);
+}
+
+/* 行内小 badge（原型 9px） */
+.add-opt__badge {
+  padding: 2rpx 8rpx;
+  font-size: 18rpx;
 }
 
 .saved {
@@ -324,8 +336,8 @@ onLoad((options: any = {}) => {
 
 .saved__title {
   display: block;
-  margin-top: 16rpx;
-  font-size: var(--fs-h1);
+  margin-top: 20rpx;
+  font-size: 38rpx;
   font-weight: 700;
   color: var(--color-text);
 }
@@ -375,8 +387,13 @@ onLoad((options: any = {}) => {
 }
 
 .saved-sticky__hint {
-  font-size: var(--fs-mini);
+  font-size: var(--fs-caption);
   color: var(--color-text-sub);
   text-align: center;
+}
+
+/* 「完成，回到首页」弱化为 #5B6478（原型 08b） */
+.saved-sticky__done {
+  color: #5b6478;
 }
 </style>

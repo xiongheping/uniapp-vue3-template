@@ -19,17 +19,17 @@
           <view class="mb-sec">
             ⭐ {{ planTitle }} 状态
           </view>
-          <x-field label="有效期至" :value="expireText" />
-          <x-field label="自动续费" last>
+          <x-field label="有效期至" :value="expireText" icon="calendar" />
+          <x-field label="自动续费" icon="refresh" last>
             <x-switch v-model:checked="autoRenewProxy" />
           </x-field>
           <view class="mb-sec mb-sec--sub">
             到期后权益变化
           </view>
-          <x-field label="AI 识别" value="无限次 → 10 次/月" />
-          <x-field label="云同步" value="关闭（本地数据保留）" />
-          <x-field label="消耗报表" value="仅查看历史" />
-          <x-field label="服药/到期提醒" value="不受影响" tone="success" last />
+          <x-field label="AI 识别" value="无限次 → 10 次/月" icon="star" />
+          <x-field label="云同步" value="关闭（本地数据保留）" icon="cloud-check" />
+          <x-field label="消耗报表" value="仅查看历史" icon="activity" />
+          <x-field label="服药/到期提醒" value="不受影响" tone="success" icon="bell-ring" last />
         </x-card>
         <view class="x-sub mb-renew-tip">
           关闭自动续费后仍可用至到期日，不会立即降级。
@@ -67,7 +67,7 @@
             {{ plan.badge }}
           </text>
           <view class="mb-plan__check" :class="{ on: selected === plan.key }">
-            <x-icon v-if="selected === plan.key" name="check" :size="24" color="#FFFFFF" :stroke-width="3" />
+            <x-icon v-if="selected === plan.key" name="check" :size="48" color="#FFFFFF" :stroke-width="3" />
           </view>
           <view class="mb-plan__name">
             {{ plan.name }}
@@ -92,11 +92,11 @@
         <view class="mb-sec">
           💳 支付方式
         </view>
-        <view class="mb-pay" @tap="payMethod = 'apple'">
+        <view class="mb-pay x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0" @tap="payMethod = 'apple'">
           <text>🍎 App 内购（iOS）</text>
           <x-radio :checked="payMethod === 'apple'" />
         </view>
-        <view class="mb-pay" @tap="payMethod = 'wechat'">
+        <view class="mb-pay x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0" @tap="payMethod = 'wechat'">
           <text>微信支付（Android）</text>
           <x-radio :checked="payMethod === 'wechat'" />
         </view>

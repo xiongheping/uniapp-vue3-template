@@ -1,5 +1,11 @@
 <template>
-  <view class="xch" :class="{ 'xch--on': active, 'xch--small': small }" @tap="emit('click')">
+  <view
+    class="xch x-tap-scale"
+    :class="{ 'xch--on': active, 'xch--small': small }"
+    hover-class="x-tap-scale--hover"
+    :hover-start-time="0"
+    @tap="emit('click')"
+  >
     <x-icon v-if="icon" :name="icon" :size="26" :color="active ? '#ffffff' : '#5B6478'" />
     <text>{{ text }}<slot /></text>
   </view>
@@ -40,6 +46,10 @@ const emit = defineEmits<{ click: [] }>();
   background: var(--color-card);
   border: 2rpx solid var(--color-border);
   border-radius: var(--radius-pill);
+  transition:
+    background-color var(--dur-normal) var(--ease-out),
+    border-color var(--dur-normal) var(--ease-out),
+    color var(--dur-normal) var(--ease-out);
 }
 
 .xch--small {

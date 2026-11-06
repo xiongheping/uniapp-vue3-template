@@ -1,16 +1,19 @@
 <template>
-  <x-page :padded="false" :reserve="manageMode ? 176 : 120">
-    <!-- 顶栏 -->
+  <x-page :padded="false" :reserve="manageMode ? 224 : 120">
+    <!-- 顶栏：批量态切换为 ✕ / 已选 N 件 / 全选（原型 07d） -->
     <view class="ov-head">
       <view class="ov-head__bar">
-        <view class="ov-head__back" @click="goBack">
-          <x-icon name="arrow-l" :size="44" :color="navColor" />
+        <view class="ov-head__back" @click="manageMode ? exitManage() : goBack()">
+          <x-icon :name="manageMode ? 'x' : 'arrow-l'" :size="44" :color="navColor" />
         </view>
         <text class="ov-head__title">
-          {{ groupTitle }}
+          {{ manageMode ? `已选 ${selectedCount} 件` : groupTitle }}
         </text>
-        <text class="ov-head__mgmt" @click="toggleManage">
-          {{ manageMode ? '完成' : '管理' }}
+        <text v-if="manageMode" class="ov-head__mgmt" @click="selectAllLocal">
+          全选
+        </text>
+        <text v-else class="ov-head__mgmt" @click="toggleManage">
+          管理
         </text>
       </view>
       <view v-if="!manageMode" class="ov-search">
@@ -24,6 +27,10 @@
         >
       </view>
     </view>
+
+    <x-note v-if="manageMode" type="blue">
+      💡 适合换季整理、搬家清点、批量标记已用完。
+    </x-note>
 
     <!-- 列表 -->
     <view class="ov-body">
@@ -39,12 +46,9 @@
                 {{ it.name }}
               </view>
               <view class="x-sub">
-                {{ catLabel(it.category) }} · {{ it.location || '未设置' }}
+                {{ rightText(it) }}
               </view>
             </view>
-            <x-tag :type="toneOf(it)">
-              {{ rightText(it) }}
-            </x-tag>
           </view>
           <x-cell
             v-else
@@ -73,34 +77,60 @@
       </x-empty>
     </view>
 
-    <!-- 批量操作条 -->
+    <!-- 批量操作条（原型 07d：两行式，上排轻操作，下排实心归档） -->
     <template v-if="manageMode" #sticky>
       <view class="ov-sticky x-safe-bottom">
-        <template v-if="selectedCount > 0">
-          <text class="ov-sticky__count">
-            已选 {{ selectedCount }} 件
-          </text>
+        <template v-if="isArchiveGroup">
           <view class="ov-actions">
-            <template v-if="isArchiveGroup">
-              <x-button type="ghost" small text="恢复" @click="doRestore" />
-              <x-button type="ghost" small text="移入回收站" @click="doTrash" />
-              <x-button type="danger" small text="彻底删除" @click="doDeleteForever" />
-            </template>
-            <template v-else>
-              <x-button type="ghost" small text="标记已用完" @click="doArchive('used')" />
-              <x-button type="ghost" small text="移到已扔" @click="doArchive('thrown')" />
-              <x-button type="danger" small text="移入回收站" @click="doTrash" />
-            </template>
+            <x-button type="ghost" small text="恢复" @click="doRestore" />
+            <x-button type="ghost" small text="移入回收站" @click="doTrash" />
+            <x-button type="danger" small text="彻底删除" @click="doDeleteForever" />
           </view>
         </template>
         <template v-else>
-          <text class="ov-sticky__count">
-            已选 0 件 · 点物品选择
-          </text>
-          <x-button type="ghost" small text="全选本页" @click="selectAllLocal" />
+          <view class="ov-sticky__row">
+            <x-button type="ghost" small text="📍 改位置" @click="batchHint('改位置')" />
+            <x-button type="ghost" small text="🔔 改提醒" @click="batchHint('改提醒')" />
+          </view>
+          <view class="ov-sticky__main">
+            <x-button type="primary" :text="`📦 归档 (${selectedCount})`" block @click="openArchive" />
+          </view>
         </template>
       </view>
     </template>
+
+    <!-- 归档方式：标记已用完 / 移到已扔（二级无边框选项行） -->
+    <x-sheet v-model:show="showArchive" :title="`归档方式 · 已选 ${selectedCount} 件`">
+      <view class="ov-opt x-tap" hover-class="x-tap--hover" :hover-start-time="0" @click="doArchive('used')">
+        <view class="ov-opt__ico">
+          <x-icon name="check" :size="40" color="#2E7D32" />
+        </view>
+        <view class="x-flex-1">
+          <view class="ov-opt__t1">
+            标记已用完
+          </view>
+          <view class="ov-opt__t2">
+            默认用于消耗品
+          </view>
+        </view>
+        <x-icon name="chev-r" :size="32" color="#C0C6D2" />
+      </view>
+      <view class="ov-opt x-tap" hover-class="x-tap--hover" :hover-start-time="0" @click="doArchive('thrown')">
+        <view class="ov-opt__ico ov-opt__ico--danger">
+          <x-icon name="trash" :size="40" color="#D93025" />
+        </view>
+        <view class="x-flex-1">
+          <view class="ov-opt__t1">
+            移到已扔
+          </view>
+          <view class="ov-opt__t2">
+            默认用于过期丢弃
+          </view>
+        </view>
+        <x-icon name="chev-r" :size="32" color="#C0C6D2" />
+      </view>
+      <x-button type="link" text="取消" block @click="showArchive = false" />
+    </x-sheet>
   </x-page>
 </template>
 
@@ -137,6 +167,7 @@ const ICON_COLOR: Record<Tone, string> = {
 
 const group = ref<string>('');
 const manageMode = ref<boolean>(false);
+const showArchive = ref<boolean>(false);
 
 const groupTitle = computed<string>(() => GROUP_TITLE[group.value] ?? '全部物品');
 const isArchiveGroup = computed<boolean>(() => group.value === 'used' || group.value === 'thrown');
@@ -239,7 +270,25 @@ function exitManage() {
   itemStore.clearSelection();
 }
 
+function openArchive() {
+  if (selectedCount.value === 0) {
+    uni.showToast({ title: '请先选择物品', icon: 'none' });
+    return;
+  }
+  showArchive.value = true;
+}
+
+/** 改位置 / 改提醒：原型为批量轻操作，当前仅提示（未接业务） */
+function batchHint(label: string) {
+  if (selectedCount.value === 0) {
+    uni.showToast({ title: '请先选择物品', icon: 'none' });
+    return;
+  }
+  uni.showToast({ title: `批量${label}：已选 ${selectedCount.value} 件`, icon: 'none' });
+}
+
 function doArchive(mode: ArchiveMode) {
+  showArchive.value = false;
   itemStore.archive([...itemStore.selectedIds], mode);
   exitManage();
   uni.showToast({ title: mode === 'used' ? '已标记用完' : '已移到已扔', icon: 'none' });
@@ -399,5 +448,61 @@ onPullDownRefresh(() => {
 
 .ov-actions > .x-button {
   flex: 1;
+}
+
+.ov-sticky__row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.ov-sticky__row > .x-button {
+  flex: 1;
+}
+
+.ov-sticky__main {
+  margin-top: 4rpx;
+}
+
+/* 归档方式二级选项：无边框行 */
+.ov-opt {
+  display: flex;
+  gap: 20rpx;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 2rpx solid var(--color-divider);
+
+  &:last-of-type {
+    border-bottom: none;
+  }
+
+  &:active {
+    opacity: 0.7;
+  }
+}
+
+.ov-opt__ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  background: #E8F5E9;
+  border-radius: 50%;
+}
+
+.ov-opt__ico--danger {
+  background: #FFEDED;
+}
+
+.ov-opt__t1 {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ov-opt__t2 {
+  margin-top: 4rpx;
+  font-size: var(--fs-caption);
+  color: var(--color-text-sub);
 }
 </style>

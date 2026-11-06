@@ -72,41 +72,53 @@
         <x-field label="可见范围" icon="lock" :value="visText" tone="purple" chevron @click="goEdit" />
       </x-card>
 
-      <!-- 提醒计划 -->
+      <!-- 提醒计划：原型为「图标 + 日期提醒 + 开关/只读」行，非时间轴 -->
       <x-card v-if="item.dueDate">
         <view class="dt-plan-title">
           提醒计划 · 仅未来节点可关
         </view>
-        <x-timeline-item
-          v-for="(node, idx) in planNodes"
-          :key="node.key"
-          :time="node.short"
-          :state="node.state"
-          :line="idx < planNodes.length - 1"
-        >
-          <view class="dt-node">
-            <view class="dt-node__main">
-              <text class="dt-node__label">
-                {{ node.label }}
-              </text>
+        <view v-for="node in planNodes" :key="node.key" class="dt-plan-row">
+          <view class="dt-plan-row__ico">
+            <x-icon name="calendar" :size="32" color="#4F7CFF" />
+          </view>
+          <view class="x-flex-1">
+            <view class="dt-plan-row__t1">
+              {{ node.short }} {{ node.label }}
               <x-tag v-if="node.sent" type="gray" mini>
                 已发送
               </x-tag>
             </view>
-            <text v-if="node.sent" class="dt-node__lock">
-              只读
-            </text>
-            <x-switch v-else mini :checked="node.on" @update:checked="(v: boolean) => toggleNode(node.days, v)" />
           </view>
-        </x-timeline-item>
+          <text v-if="node.sent" class="dt-node__lock">
+            只读
+          </text>
+          <x-switch v-else mini :checked="node.on" @update:checked="(v: boolean) => toggleNode(node.days, v)" />
+        </view>
       </x-card>
     </template>
 
     <template v-if="item" #sticky>
-      <view class="x-btns row x-safe-bottom">
-        <x-button type="ghost" small icon="pencil" text="编辑" @click="goEdit" />
-        <x-button type="ghost" small icon="check" text="已用完" @click="onArchiveUsed" />
-        <x-button type="danger" small icon="trash" text="已扔" @click="showTrash = true" />
+      <view class="dt-sticky x-safe-bottom">
+        <view class="dt-sticky__row">
+          <x-button type="ghost" small icon="pencil" text="编辑" @click="goEdit" />
+          <x-button
+            type="ghost"
+            small
+            icon="check"
+            text="已用完"
+            class="dt-sticky__used"
+            style="color: #52c41a; border-color: #c9e9c9;"
+            @click="onArchiveUsed"
+          />
+        </view>
+        <x-button
+          type="danger"
+          small
+          icon="trash"
+          class="dt-sticky__trash"
+          style="width: 96rpx; padding: 0;"
+          @click="showTrash = true"
+        />
       </view>
     </template>
 
@@ -114,27 +126,22 @@
       <!-- 10b 移到已扔确认 -->
       <x-sheet v-model:show="showTrash" mode="center" :mask-closable="false" title="移到“已扔”？">
         <template #sub>
-          <text class="dt-sheet-sub">
-            将归档：
-            <text class="dt-b">
-              {{ item.name }}
-            </text>
-            \n（{{ item.location || '未设置位置' }}
-            <text v-if="item.dueDate">
-              · {{ item.dueDate }} 到期
-            </text>
-            ）
-          </text>
+          <view class="dt-sheet-sub">
+            <view>
+              将归档：<text class="dt-b">
+                {{ item.name }}
+              </text>
+            </view>
+            <view>
+              （{{ item.location || '未设置位置' }}<text v-if="item.dueDate">
+                · {{ item.dueDate }} 到期
+              </text>）
+            </view>
+          </view>
         </template>
         <x-note>
           💡 “已扔”是归档终态，可在 归档→已扔 中恢复，不会进回收站。
         </x-note>
-        <view class="dt-opt" @click="withRemind = !withRemind">
-          <x-check :checked="withRemind" />
-          <text class="dt-opt__txt">
-            同时删除该物品的到期提醒
-          </text>
-        </view>
         <x-button type="danger" text="确认移到已扔" @click="confirmTrash" />
         <x-button type="gray" text="取消" @click="showTrash = false" />
       </x-sheet>
@@ -198,7 +205,6 @@ const PLAN_DAYS = [7, 3, 0];
 const itemId = ref<string>('');
 const showTrash = ref<boolean>(false);
 const showMore = ref<boolean>(false);
-const withRemind = ref<boolean>(false);
 
 const item = computed<ItemRecord | null>(() => itemStore.findItem(itemId.value));
 
@@ -340,12 +346,8 @@ function confirmTrash() {
   if (!it) {
     return;
   }
-  if (withRemind.value) {
-    itemStore.updateItem(it.id, { remindDays: [] });
-  }
   itemStore.archive([it.id], 'thrown');
   showTrash.value = false;
-  withRemind.value = false;
   uni.showToast({ title: '已移到「已扔」', icon: 'none' });
 }
 
@@ -403,7 +405,7 @@ onLoad((options: Record<string, string> = {}) => {
   display: flex;
   justify-content: space-between;
   margin-top: 12rpx;
-  font-size: var(--fs-mini);
+  font-size: var(--fs-caption);
   color: var(--color-text-sub);
 }
 
@@ -455,6 +457,59 @@ onLoad((options: Record<string, string> = {}) => {
 .dt-node__lock {
   font-size: var(--fs-mini);
   color: var(--color-text-mute);
+}
+
+/* 提醒计划行（原型 10：图标 + 日期提醒 + 开关） */
+.dt-plan-row {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  min-height: 96rpx;
+  padding: 22rpx 0;
+  border-bottom: 2rpx solid var(--color-divider);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.dt-plan-row__ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  background: var(--color-primary-soft);
+  border-radius: 24rpx;
+}
+
+.dt-plan-row__t1 {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  font-size: 26rpx;
+  color: var(--color-text);
+}
+
+/* 吸底：编辑/已用完 + 窄红删除 */
+.dt-sticky {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.dt-sticky__row {
+  display: flex;
+  flex: 1;
+  gap: 16rpx;
+}
+
+.dt-sticky__row > .x-button {
+  flex: 1;
+}
+
+.dt-sticky__trash {
+  width: 96rpx;
 }
 
 .dt-sheet-sub {

@@ -15,13 +15,40 @@
       </view>
     </view>
 
-    <!-- 疗程：属于用药域 -->
+    <!-- 疗程：按原型 19 展示已完成/进行中的疗程卡 -->
     <view v-if="activeSeg === 'course'">
-      <x-empty emoji="💊" title="疗程记录在用药域" sub="完成一个用药计划后会归档到这里，可在用药页查看历史疗程。">
-        <template #action>
-          <x-button type="ghost" text="去用药" @click="goMedicine" />
-        </template>
-      </x-empty>
+      <x-card v-if="courseList.length > 0">
+        <view v-for="(p, idx) in courseList" :key="p.id">
+          <view class="ar-row">
+            <view class="ar-ico">
+              <x-icon name="pill" :size="36" color="#2E7D32" />
+            </view>
+            <view class="x-flex-1">
+              <view class="ar-name x-ellipsis">
+                {{ p.name }}
+              </view>
+              <view class="x-sub">
+                {{ courseSub(p) }}
+              </view>
+            </view>
+            <x-tag :type="isCourseDone(p) ? 'green' : 'blue'">
+              {{ isCourseDone(p) ? '完成' : '进行中' }}
+            </x-tag>
+          </view>
+          <view class="x-btns row">
+            <x-button type="ghost" small text="📄 记录" @click="gotoPlan(p.id)" />
+            <x-button type="ghost" small text="🛒 再买" @click="rebuy(p.name)" />
+          </view>
+          <view v-if="idx !== courseList.length - 1" class="ar-divider" />
+        </view>
+      </x-card>
+      <view v-else class="ar-empty-wrap">
+        <x-empty emoji="💊" title="还没有疗程记录" sub="完成一个用药计划后会归档到这里，可在用药页查看历史疗程。">
+          <template #action>
+            <x-button type="ghost" text="去用药" @click="goMedicine" />
+          </template>
+        </x-empty>
+      </view>
     </view>
 
     <!-- 回收站 -->
@@ -73,13 +100,15 @@
                   {{ usedSub(it) }}
                 </view>
               </view>
-              <x-tag type="gray">
-                已用完
-              </x-tag>
+              <view class="x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="rebuy(it.name)">
+                <x-tag type="gray">
+                  🛒 再买
+                </x-tag>
+              </view>
             </view>
             <view class="x-btns row">
               <x-button type="ghost" small icon="undo" text="恢复" @click="onRestore(it.id)" />
-              <x-button type="ghost" small text="移入回收站" @click="onTrash(it.id)" />
+              <x-button type="ghost" small text="移入回收站" class="ar-trashbtn" @click="onTrash(it.id)" />
             </view>
             <view v-if="idx !== usedItems.length - 1" class="ar-divider" />
           </view>
@@ -113,7 +142,7 @@
             </view>
             <view class="x-btns row">
               <x-button type="ghost" small icon="undo" text="恢复" @click="onRestore(it.id)" />
-              <x-button type="danger" small text="移入回收站" @click="onTrash(it.id)" />
+              <x-button type="ghost" small text="移入回收站" class="ar-trashbtn" @click="onTrash(it.id)" />
             </view>
             <view v-if="idx !== thrownItems.length - 1" class="ar-divider" />
           </view>
@@ -136,8 +165,9 @@
 
 <script setup lang="ts">
 import type { ItemRecord } from '@/store/modules/item/types';
+import type { MedPlan } from '@/store/modules/medicine/types';
 import { switchTabPath } from '@/router/tab-bar';
-import { useItemStore } from '@/store';
+import { useItemStore, useMedicineStore } from '@/store';
 import { diffDays, dotDate, shortDate } from '@/utils/date';
 
 type SegKey = 'all' | 'course' | 'used' | 'thrown' | 'trash';
@@ -148,6 +178,31 @@ interface SegOption {
 }
 
 const itemStore = useItemStore();
+const medicineStore = useMedicineStore();
+
+/** 疗程列表（原型 19 第一段：完成 / 进行中） */
+const courseList = computed<MedPlan[]>(() => medicineStore.courses);
+
+function isCourseDone(plan: MedPlan): boolean {
+  const course = plan.course as { index?: number; total?: number } | undefined;
+  if (!course) {
+    return false;
+  }
+  return Number(course.index || 0) >= Number(course.total || 0);
+}
+
+function courseSub(plan: MedPlan): string {
+  const course = plan.course as { index?: number; total?: number; start?: string } | undefined;
+  const reason = plan.reason ? `${plan.reason} · ` : '';
+  if (!course) {
+    return reason || '未设置疗程';
+  }
+  return `${reason}第 ${course.index || 1}/${course.total || 7} 天`;
+}
+
+function gotoPlan(planId: string) {
+  uni.navigateTo({ url: `/pages/med/plan/index?planId=${planId}` });
+}
 
 const TRASH_DAYS = 30;
 const SEGS: SegOption[] = [
@@ -208,6 +263,11 @@ function onTrash(id: string) {
   uni.showToast({ title: '已移入回收站', icon: 'none' });
 }
 
+/** 再买：带着原名称进入手动录入（原型 19「🛒 再买」） */
+function rebuy(name: string) {
+  uni.navigateTo({ url: `/pages/item/add/index?method=keyboard&name=${encodeURIComponent(name)}` });
+}
+
 function onDeleteForever(id: string) {
   const it = itemStore.findItem(id);
   uni.showModal({
@@ -237,12 +297,13 @@ onLoad((options: Record<string, string> = {}) => {
 </script>
 
 <style lang="scss" scoped>
+/* 原型 .seg：12px 外框 / 9px 选项圆角 + 选中微阴影 */
 .ar-seg {
   display: flex;
   padding: 6rpx;
   margin: 8rpx 0 24rpx;
   background: var(--color-fill);
-  border-radius: var(--radius-pill);
+  border-radius: 24rpx;
 }
 
 .ar-seg__item {
@@ -250,16 +311,21 @@ onLoad((options: Record<string, string> = {}) => {
   flex: 1;
   align-items: center;
   justify-content: center;
-  min-height: 68rpx;
+  min-height: 72rpx;
   font-size: var(--fs-sub);
   font-weight: 600;
   color: var(--color-text-sub);
-  border-radius: var(--radius-pill);
+  border-radius: 18rpx;
+  transition:
+    background-color var(--dur-normal) var(--ease-out),
+    color var(--dur-normal) var(--ease-out),
+    box-shadow var(--dur-normal) var(--ease-out);
 }
 
 .ar-seg__item.on {
   color: var(--color-primary);
   background: var(--color-card);
+  box-shadow: 0 2rpx 6rpx rgb(20 30 60 / 8%);
 }
 
 .ar-group-title {
@@ -268,6 +334,11 @@ onLoad((options: Record<string, string> = {}) => {
   font-size: var(--fs-sub);
   font-weight: 700;
   color: var(--color-text-sub);
+}
+
+.ar-trashbtn {
+  color: #b3261e !important;
+  border-color: #fbcbcb !important;
 }
 
 .ar-row {

@@ -1,12 +1,12 @@
 <template>
-  <view class="xp-root" :class="{ dark: isDark, elder: settingStore.isElder }" :style="bgStyle">
+  <view class="xp-root" :class="{ dark: isDark, elder: settingStore.isElder }" :style="rootStyle">
     <scroll-view class="xp-scroll" scroll-y>
       <view class="xp-body" :class="{ 'xp-body--padded': padded }" :style="bodyStyle">
         <slot />
       </view>
     </scroll-view>
 
-    <view v-if="$slots.sticky" class="xp-sticky x-safe-bottom">
+    <view v-if="$slots.sticky" class="xp-sticky">
       <slot name="sticky" />
     </view>
 
@@ -45,7 +45,20 @@ const settingStore = useSettingStore();
 
 const isDark = computed<boolean>(() => appStore.getTheme === 'dark');
 
-const bgStyle = computed<string>(() => (props.bg ? `background:${props.bg};` : ''));
+/** 真实状态栏高度（px）；>0 时以 CSS 变量透传（小程序端 --status-bar-height 的运行时注入点） */
+const statusBarHeight = computed<number>(() => appStore.getSystemInfo?.statusBarHeight || 0);
+
+const rootStyle = computed<string>(() => {
+  const parts: string[] = [];
+  if (props.bg) {
+    parts.push(`background:${props.bg}`);
+  }
+  if (statusBarHeight.value > 0) {
+    parts.push(`--status-bar-height:${statusBarHeight.value}px`);
+  }
+  return parts.join(';');
+});
+
 const bodyStyle = computed<string>(() =>
   props.reserve > 0 ? `padding-bottom:calc(${props.reserve * 2}rpx + env(safe-area-inset-bottom, 0px));` : '',
 );
@@ -78,7 +91,7 @@ const bodyStyle = computed<string>(() =>
   bottom: 0;
   left: 0;
   z-index: 10;
-  padding: 16rpx 32rpx;
+  padding: 24rpx 32rpx calc(40rpx + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, var(--color-bg) 75%, transparent);
 }
 </style>

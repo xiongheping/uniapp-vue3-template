@@ -47,7 +47,7 @@ const emit = defineEmits<{ click: [] }>();
   align-items: center;
   justify-content: space-between;
   min-height: var(--h-cell);
-  padding: 24rpx 0;
+  padding: 26rpx 0;
   font-size: var(--fs-body);
   border-bottom: 2rpx solid var(--color-divider);
 }
@@ -72,7 +72,7 @@ const emit = defineEmits<{ click: [] }>();
 }
 
 .xf__v {
-  font-size: var(--fs-sub);
+  font-size: 26rpx;
   color: var(--color-text-sub);
   text-align: right;
 }

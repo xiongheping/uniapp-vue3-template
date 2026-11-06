@@ -42,11 +42,18 @@
       <x-button large :disabled="takeBlocked" :text="takeText" @click="handleTake" />
 
       <view class="x-btns row ck-btns">
-        <view class="ck-btn" @tap="handleSnoozeTap">
+        <view class="ck-btn x-tap" hover-class="x-tap--hover" :hover-start-time="0" @tap="handleSnoozeTap">
           <x-button type="ghost" small :disabled="snoozeBlocked" :text="snoozeText" />
         </view>
         <view class="ck-btn">
-          <x-button type="ghost" small text="今天跳过" :disabled="status !== 'pending'" @click="handleSkip" />
+          <x-button
+            type="ghost"
+            small
+            text="今天跳过"
+            class="ck-skip"
+            :disabled="status !== 'pending'"
+            @click="handleSkip"
+          />
         </view>
       </view>
       <x-button type="danger" small text="标记为已错过" :disabled="status !== 'pending'" @click="handleMissed" />
@@ -65,7 +72,7 @@
       </view>
 
       <!-- 说明书摘录（点击进 12） -->
-      <view class="ck-leaflet" @tap="gotoLeaflet">
+      <view class="ck-leaflet x-tap" hover-class="x-tap--hover" :hover-start-time="0" @tap="gotoLeaflet">
         <text class="ck-leaflet__title">
           📄 说明书原文
         </text>
@@ -317,34 +324,38 @@ onUnmounted(stopTimer);
 </script>
 
 <style lang="scss" scoped>
+/* 原型 13 snackbar：深色浮层 toast（rgba(20,30,60,.94) 白字 + #8FB0FF 撤销链） */
 .ck-snack {
+  position: fixed;
+  right: 32rpx;
+  bottom: 192rpx;
+  left: 32rpx;
+  z-index: 30;
   display: flex;
-  gap: 16rpx;
+  gap: 24rpx;
   align-items: center;
-  justify-content: space-between;
-  padding: 22rpx 24rpx;
-  margin-bottom: 20rpx;
-  font-size: var(--fs-sub);
-  color: var(--color-note-green-text);
-  background: var(--color-note-green-bg);
-  border-radius: 20rpx;
+  padding: 28rpx 32rpx;
+  font-size: 26rpx;
+  color: #ffffff;
+  background: rgb(20 30 60 / 94%);
+  border-radius: 28rpx;
 }
 
 .ck-snack__ok {
   flex: 1;
   min-width: 0;
-  font-weight: 600;
 }
 
 .ck-snack__undo {
   flex-shrink: 0;
   font-weight: 700;
-  color: var(--color-primary);
+  color: #8fb0ff;
+  white-space: nowrap;
 }
 
 .ck-snack__gone {
   flex-shrink: 0;
-  color: var(--color-text-mute);
+  color: rgb(255 255 255 / 55%);
 }
 
 .ck-hero {
@@ -368,7 +379,7 @@ onUnmounted(stopTimer);
 
 .ck-hero__sub {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 12rpx;
   font-size: var(--fs-sub);
   color: var(--color-text-sub);
 }
@@ -386,6 +397,12 @@ onUnmounted(stopTimer);
 .ck-btn {
   flex: 1;
   min-width: 0;
+}
+
+/* 「今天跳过」弱化：#8A93A5 字 / #E4E8F0 边（原型 13） */
+.ck-btn :deep(.ck-skip.x-button--ghost) {
+  color: #8a93a5;
+  border-color: #e4e8f0;
 }
 
 .ck-stock {

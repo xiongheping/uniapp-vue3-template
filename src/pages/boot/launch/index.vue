@@ -13,6 +13,9 @@
       <view class="launch__badge">
         🔒 数据默认只存在你手机里
       </view>
+      <view class="launch__enter x-tap-on-color" hover-class="x-tap-on-color--hover" :hover-start-time="0" @tap="goNext">
+        进入 ›
+      </view>
       <view class="launch__version">
         v1.0.0
       </view>
@@ -29,17 +32,36 @@ const GUIDE_KEY = 'guide_seen';
 // 游客模式标记（与 store/modules/item 的 guest 判定对应）
 const GUEST_KEY = 'guest_mode';
 
+let timer: ReturnType<typeof setTimeout> | null = null;
+let jumped = false;
+
+/** 按原型逻辑分流：引导在登录前 */
+function goNext() {
+  if (jumped) {
+    return;
+  }
+  jumped = true;
+  if (timer) {
+    clearTimeout(timer);
+  }
+  if (uni.getStorageSync(GUIDE_KEY) !== true) {
+    uni.redirectTo({ url: '/pages/boot/guide/index' });
+    return;
+  }
+  const isGuest = uni.getStorageSync(GUEST_KEY) === true;
+  // 已登录或游客可直接进首页，其余进登录页
+  uni.redirectTo({ url: isLogin() || isGuest ? HOME_PATH : LOGIN_PATH });
+}
+
 onLoad(() => {
-  // 冷启动短暂停留（约 1.5s）后按原型逻辑分流：引导在登录前
-  setTimeout(() => {
-    if (uni.getStorageSync(GUIDE_KEY) !== true) {
-      uni.redirectTo({ url: '/pages/boot/guide/index' });
-      return;
-    }
-    const isGuest = uni.getStorageSync(GUEST_KEY) === true;
-    // 已登录或游客可直接进首页，其余进登录页
-    uni.redirectTo({ url: isLogin() || isGuest ? HOME_PATH : LOGIN_PATH });
-  }, 1500);
+  // 冷启动 1.5s 自动进入，也可点「进入 ›」立即跳过
+  timer = setTimeout(goNext, 1500);
+});
+
+onUnload(() => {
+  if (timer) {
+    clearTimeout(timer);
+  }
 });
 </script>
 
@@ -79,8 +101,20 @@ onLoad(() => {
   border-radius: 24rpx;
 }
 
-.launch__version {
+.launch__enter {
+  padding: 20rpx 48rpx;
   margin-top: 104rpx;
+  font-size: var(--fs-sub);
+  background: rgb(255 255 255 / 22%);
+  border-radius: 48rpx;
+
+  &:active {
+    background: rgb(255 255 255 / 32%);
+  }
+}
+
+.launch__version {
+  margin-top: 24rpx;
   font-size: var(--fs-mini);
   opacity: 0.7;
 }

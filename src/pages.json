@@ -84,6 +84,13 @@
           "style": {
             "navigationBarTitleText": "主题设置"
           }
+        },
+        {
+          "path": "tokens/index",
+          "style": {
+            "navigationBarTitleText": "Design Tokens",
+            "navigationStyle": "custom"
+          }
         }
       ]
     },
@@ -207,6 +214,13 @@
           "path": "merge/index",
           "style": {
             "navigationBarTitleText": "数据合并",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "elder/index",
+          "style": {
+            "navigationBarTitleText": "长辈模式",
             "navigationStyle": "custom"
           }
         }

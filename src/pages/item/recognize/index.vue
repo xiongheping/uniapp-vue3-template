@@ -109,9 +109,7 @@
           <text class="rec-field__k">
             数量
           </text>
-          <view class="rec-field__v">
-            <text>{{ result.spec }}</text>
-          </view>
+          <x-quantity :model-value="qty" text="1 盒 5 片" @decrease="qty = Math.max(1, qty - 1)" @increase="qty += 1" />
         </view>
       </x-card>
       <x-note type="blue">
@@ -121,13 +119,74 @@
         <x-button type="ghost" small icon="eye" text="查看原图" @click="previewPhoto" />
         <x-button type="ghost" small icon="camera" text="重拍" @click="reshoot" />
       </view>
+    </view>
 
-      <template #sticky>
-        <view class="x-btns row x-safe-bottom">
-          <x-button type="ghost" icon="keyboard" text="手动输入" @click="toManual" />
-          <x-button type="primary" text="确认保存" @click="toConfirm" />
+    <!-- 09c 识别确认（识别成功） -->
+    <view v-else-if="stage === 'ok'" class="rec">
+      <x-note type="blue">
+        ✨ AI 识别完成，请核对。开始识别已预占 1 次 ·
+        <text class="rec-b">
+          确认保存才消耗
+        </text>
+        · 取消则释放。
+      </x-note>
+      <x-card>
+        <view class="rec-field">
+          <text class="rec-field__k">
+            名称
+          </text>
+          <view class="rec-field__v">
+            <text>{{ result.name }}</text>
+            <text class="rec-conf hi">
+              ●97%
+            </text>
+          </view>
         </view>
-      </template>
+        <view class="rec-field">
+          <text class="rec-field__k">
+            生产日期
+          </text>
+          <view class="rec-field__v">
+            <text>{{ result.produceDate }}</text>
+            <text class="rec-conf mid">
+              ●74%
+            </text>
+          </view>
+        </view>
+        <view class="rec-field x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0" @tap="pickDue">
+          <text class="rec-field__k">
+            到期日
+          </text>
+          <view class="rec-field__v">
+            <text class="rec-blue">
+              {{ result.dueDate || '未识别' }} · 日历选择 ›
+            </text>
+          </view>
+        </view>
+        <view class="rec-field">
+          <text class="rec-field__k">
+            数量
+          </text>
+          <x-quantity :model-value="qty" text="1 盒 5 片" @decrease="qty = Math.max(1, qty - 1)" @increase="qty += 1" />
+        </view>
+      </x-card>
+      <x-card>
+        <view class="rec-field">
+          <text class="rec-field__k">
+            谁可以看到
+          </text>
+          <view class="rec-vis">
+            <x-chip small icon="lock" text="仅自己" :active="visibility === 'self'" @click="visibility = 'self'" />
+            <x-chip small text="家人" :active="visibility === 'family'" @click="visibility = 'family'" />
+          </view>
+        </view>
+        <view class="rec-field">
+          <text class="rec-field__k">
+            💊 是药品，需服药提醒
+          </text>
+          <x-switch :checked="needRemind" @update:checked="(v: boolean) => (needRemind = v)" />
+        </view>
+      </x-card>
     </view>
 
     <!-- 09b 识别失败 -->
@@ -160,7 +219,10 @@
         本月 AI 识别次数已用完
       </text>
       <text class="rec-state__sub">
-        免费版每月 {{ quotaTotal }} 次，已用 {{ quotaTotal }} 次。\n下月 1 日自动恢复；手动输入、扫条码、到期提醒
+        免费版每月 {{ quotaTotal }} 次，已用 {{ quotaTotal }} 次。
+      </text>
+      <text class="rec-state__sub">
+        下月 1 日自动恢复；手动输入、扫条码、到期提醒
         <text class="rec-b">
           不受影响
         </text>
@@ -196,14 +258,27 @@
         <x-button type="primary" icon="crown" text="升级会员 · AI 识别无限次" @click="goMember" />
         <x-button type="ghost" icon="keyboard" text="手动输入（不消耗次数）" @click="toManual" />
       </view>
-      <text class="x-sub" style="margin-top: 16rpx; font-size: var(--fs-mini)">
+      <text class="x-sub" style="margin-top: 24rpx; font-size: 22rpx">
         升级后立即生效，到期前 3 天提醒
       </text>
     </view>
 
-    <!-- 调试态开关（供验收四态） -->
+    <!-- 吸底操作（必须在 x-page 直接子级，否则不会吸底） -->
+    <template #sticky>
+      <view v-if="stage === 'lowconf'" class="x-btns row x-safe-bottom">
+        <x-button type="ghost" icon="keyboard" text="手动输入" @click="toManual" />
+        <x-button type="primary" text="确认保存（用预占次数）" @click="toConfirm" />
+      </view>
+      <view v-else-if="stage === 'ok'" class="x-btns row x-safe-bottom">
+        <x-button type="ghost" text="重拍" @click="reshoot" />
+        <x-button type="primary" text="确认保存（用预占次数）" @click="toConfirm" />
+      </view>
+    </template>
+
+    <!-- 调试态开关（供验收五态） -->
     <view class="rec-switch">
       <x-chip small :active="stage === 'recognizing'" text="识别中" @click="forceStage('recognizing')" />
+      <x-chip small :active="stage === 'ok'" text="识别成功" @click="forceStage('ok')" />
       <x-chip small :active="stage === 'lowconf'" text="低置信度" @click="forceStage('lowconf')" />
       <x-chip small :active="stage === 'failed'" text="失败" @click="forceStage('failed')" />
       <x-chip small :active="stage === 'quota'" text="额度耗尽" @click="forceStage('quota')" />
@@ -215,8 +290,8 @@
 import { useTheme } from '@/hooks';
 import { useSettingStore } from '@/store';
 
-// recognizing | lowconf | failed | quota
-type Stage = 'recognizing' | 'lowconf' | 'failed' | 'quota';
+// recognizing | ok | lowconf | failed | quota
+type Stage = 'recognizing' | 'ok' | 'lowconf' | 'failed' | 'quota';
 
 const settingStore = useSettingStore();
 const { isDark } = useTheme();
@@ -244,7 +319,23 @@ const result = ref({
   spec: '1 盒 5 片',
 });
 
-const NAV_TITLE: Record<Stage, string> = { recognizing: 'AI 识别中', lowconf: '核对识别结果', failed: '识别失败', quota: 'AI 额度' };
+// 09c 确认页的交互字段
+const qty = ref<number>(1);
+const visibility = ref<'self' | 'family'>('self');
+const needRemind = ref<boolean>(true);
+
+/** 到期日：复用系统日期选择（原型「日历选择 ›」） */
+function pickDue() {
+  uni.showToast({ title: '选择到期日', icon: 'none' });
+}
+
+const NAV_TITLE: Record<Stage, string> = {
+  recognizing: 'AI 识别中',
+  ok: '确认信息',
+  lowconf: '核对识别结果',
+  failed: '识别失败',
+  quota: 'AI 额度',
+};
 const navTitle = computed(() => NAV_TITLE[stage.value] || 'AI 识别中');
 
 function occupy() {
@@ -407,13 +498,14 @@ onUnmounted(() => {
   text-align: center;
 }
 
+/* 09 取景器：原型 1:1 方形 + 20px 圆角 */
 .rec-view {
   position: relative;
-  height: 400rpx;
+  aspect-ratio: 1 / 1;
   margin-bottom: 24rpx;
   overflow: hidden;
   background: linear-gradient(110deg, #1a2233 40%, #2a3040 50%, #1a2233 60%);
-  border-radius: var(--radius-card);
+  border-radius: 40rpx;
 }
 
 .rec-view__img {
@@ -431,12 +523,12 @@ onUnmounted(() => {
 }
 
 .rec-view__emoji {
-  margin-bottom: 16rpx;
+  margin-bottom: 20rpx;
   font-size: 96rpx;
 }
 
 .rec-view__tip {
-  font-size: var(--fs-caption);
+  font-size: var(--fs-sub);
   opacity: 0.7;
 }
 
@@ -447,7 +539,7 @@ onUnmounted(() => {
 }
 
 .rec-status__main {
-  font-size: var(--fs-sub);
+  font-size: 26rpx;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -459,7 +551,7 @@ onUnmounted(() => {
   border: 4rpx solid var(--color-border);
   border-top-color: var(--color-primary);
   border-radius: 50%;
-  animation: rec-rot 0.9s linear infinite;
+  animation: rec-rot 1s linear infinite;
 }
 
 @keyframes rec-rot {
@@ -485,12 +577,14 @@ onUnmounted(() => {
   color: var(--color-text);
 }
 
+/* 原型 .field：k 深色 500 / v 灰 13px 右对齐 */
 .rec-field {
   display: flex;
+  gap: 16rpx;
   align-items: center;
   justify-content: space-between;
-  min-height: var(--h-touch);
-  padding: 20rpx 0;
+  min-height: 88rpx;
+  padding: 26rpx 0;
   border-bottom: 2rpx solid var(--color-divider);
 }
 
@@ -500,26 +594,32 @@ onUnmounted(() => {
 
 .rec-field__k {
   font-size: var(--fs-body);
-  color: var(--color-text-sub);
+  font-weight: 500;
+  color: var(--color-text);
 }
 
 .rec-field__v {
   display: flex;
   gap: 12rpx;
   align-items: center;
-  font-size: var(--fs-body);
-  font-weight: 600;
-  color: var(--color-text);
+  font-size: 26rpx;
+  color: var(--color-text-sub);
+  text-align: right;
 }
 
 .rec-lo {
-  color: var(--color-danger-strong);
+  font-weight: 600;
+  color: #d93025;
 }
 
 .rec-conf {
-  padding: 2rpx 12rpx;
-  font-size: var(--fs-mini);
-  border-radius: 10rpx;
+  display: inline-flex;
+  gap: 8rpx;
+  align-items: center;
+  padding: 4rpx 16rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  border-radius: 20rpx;
 }
 
 .rec-conf.hi {
@@ -528,8 +628,24 @@ onUnmounted(() => {
 }
 
 .rec-conf.lo {
-  color: var(--color-danger-strong);
-  background: var(--color-danger-tag-bg);
+  color: #d93025;
+  background: #ffe5e5;
+}
+
+.rec-conf.mid {
+  color: #c77700;
+  background: #fff0db;
+}
+
+.rec-blue {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.rec-vis {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
 }
 
 .rec-state {
@@ -541,13 +657,13 @@ onUnmounted(() => {
 }
 
 .rec-state__emoji {
-  font-size: 108rpx;
+  font-size: 120rpx;
   line-height: 1.2;
 }
 
 .rec-state__title {
-  margin: 20rpx 0 10rpx;
-  font-size: var(--fs-h1);
+  margin: 28rpx 0 16rpx;
+  font-size: 38rpx;
   font-weight: 700;
   color: var(--color-text);
 }

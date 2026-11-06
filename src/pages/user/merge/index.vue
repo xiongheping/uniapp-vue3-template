@@ -31,7 +31,7 @@
         <view class="mg-sec">
           请选择合并方式
         </view>
-        <view v-for="opt in strategyOptions" :key="opt.value" class="mg-opt" @tap="strategy = opt.value">
+        <view v-for="opt in strategyOptions" :key="opt.value" class="mg-opt x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0" @tap="strategy = opt.value">
           <text class="mg-opt__label">
             {{ opt.label }}
           </text>
@@ -41,11 +41,11 @@
 
       <!-- PRD 判重规则卡（默认收起，点标题展开，热区 ≥44dp） -->
       <view class="mg-prd">
-        <view class="mg-prd__head" @tap="prdOpen = !prdOpen">
+        <view class="mg-prd__head x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0" @tap="prdOpen = !prdOpen">
           <text>📌 查看判重规则（PRD）</text>
           <x-icon name="chev-d" :size="32" :color="prdColor" />
         </view>
-        <view v-if="prdOpen" class="mg-prd__body">
+        <view v-show="prdOpen" class="mg-prd__body x-expand">
           <view class="mg-prd__intro">
             判重键：
             <text class="mg-strong">

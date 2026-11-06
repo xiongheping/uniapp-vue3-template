@@ -18,8 +18,8 @@ withDefaults(defineProps<Props>(), { type: 'gray' });
 <style lang="scss" scoped>
 .xt {
   flex-shrink: 0;
-  padding: 4rpx 16rpx;
-  font-size: var(--fs-mini);
+  padding: 6rpx 16rpx;
+  font-size: var(--fs-caption);
   font-weight: 600;
   white-space: nowrap;
   border-radius: 10rpx;

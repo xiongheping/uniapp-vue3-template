@@ -409,8 +409,8 @@ onShow(async () => {
 
 .fq-digest__k {
   display: block;
-  font-size: var(--fs-caption);
-  opacity: 0.88;
+  font-size: var(--fs-sub);
+  opacity: 0.85;
 }
 
 .fq-digest__num {
@@ -424,9 +424,9 @@ onShow(async () => {
 }
 
 .fq-digest__unit {
-  font-size: var(--fs-caption);
+  font-size: var(--fs-sub);
   font-weight: 400;
-  opacity: 0.85;
+  opacity: 0.8;
 }
 
 .fq-chips {

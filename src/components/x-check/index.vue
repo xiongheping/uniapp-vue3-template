@@ -26,6 +26,7 @@ withDefaults(defineProps<Props>(), { checked: false });
   background: var(--color-card);
   border: 3rpx solid var(--color-fill);
   border-radius: 14rpx;
+  transition: background-color var(--dur-normal) var(--ease-out), border-color var(--dur-normal) var(--ease-out);
 }
 
 .xck--on {

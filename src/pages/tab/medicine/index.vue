@@ -11,50 +11,15 @@
       </view>
     </x-nav-bar>
 
-    <!-- 概览 -->
+    <!-- 概览：仅你可见（原型 11 头部 lock 徽标） -->
     <view class="med-line">
       <view class="med-lock">
-        <x-icon name="lock" :size="24" color="#6B7590" />
+        <x-icon name="lock" :size="48" color="#6B7590" />
         <text>仅你可见</text>
       </view>
       <text class="med-line__tip">
         待服 {{ pendingCount }} 条 · 与首页一致
       </text>
-    </view>
-
-    <view class="med-stats">
-      <view class="med-stat">
-        <text class="med-stat__num">
-          {{ todayDone }}/{{ todayTotal }}
-        </text>
-        <text class="med-stat__label">
-          今日完成
-        </text>
-      </view>
-      <view class="med-stat">
-        <text class="med-stat__num">
-          {{ streakDays }} 天
-        </text>
-        <text class="med-stat__label">
-          连续打卡
-        </text>
-      </view>
-      <view class="med-stat">
-        <text class="med-stat__num">
-          {{ pendingCount }}
-        </text>
-        <text class="med-stat__label">
-          待服用
-        </text>
-      </view>
-      <view class="med-stat">
-        <text class="med-stat__num" :class="{ warn: missedCount > 0 }">
-          {{ missedCount }}
-        </text>
-        <text class="med-stat__label">
-          漏服待补
-        </text>
-      </view>
     </view>
 
     <!-- 11b 今日全部完成庆祝（动效只播一次）；无下一剂时空态；否则展示下一剂卡片 -->
@@ -92,10 +57,7 @@
           </text>
         </view>
       </x-card>
-      <view class="x-btns row">
-        <x-button type="ghost" text="查看本周记录" @click="revealAll" />
-        <x-button type="ghost" text="分享今日成果" icon="send" @click="handleShare" />
-      </view>
+      <x-button type="ghost" text="查看本周记录" @click="revealAll" />
     </view>
 
     <x-card v-else-if="nextEntry" highlight>
@@ -150,7 +112,7 @@
       :state="dotState(item)"
       :line="index < shownEntries.length - 1"
     >
-      <view class="med-tl-card" :class="{ on: item.key === nextKey }" @tap="gotoCheckin(item)">
+      <view class="med-tl-card x-tap" :class="{ on: item.key === nextKey }" hover-class="x-tap--hover" :hover-start-time="0" @tap="gotoCheckin(item)">
         <view class="med-tl-card__t1">
           <text>{{ item.name }} · {{ item.amount }}</text>
           <text v-if="item.status === 'taken'" class="med-tl-card__ok">
@@ -181,6 +143,42 @@
         </view>
       </view>
     </x-timeline-item>
+
+    <!-- 数据概览：时间轴之后，不打断原型 11 的首屏信息顺序 -->
+    <view class="med-stats">
+      <view class="med-stat">
+        <text class="med-stat__num">
+          {{ todayDone }}/{{ todayTotal }}
+        </text>
+        <text class="med-stat__label">
+          今日完成
+        </text>
+      </view>
+      <view class="med-stat">
+        <text class="med-stat__num">
+          {{ streakDays }} 天
+        </text>
+        <text class="med-stat__label">
+          连续打卡
+        </text>
+      </view>
+      <view class="med-stat">
+        <text class="med-stat__num">
+          {{ pendingCount }}
+        </text>
+        <text class="med-stat__label">
+          待服用
+        </text>
+      </view>
+      <view class="med-stat">
+        <text class="med-stat__num" :class="{ warn: missedCount > 0 }">
+          {{ missedCount }}
+        </text>
+        <text class="med-stat__label">
+          漏服待补
+        </text>
+      </view>
+    </view>
 
     <!-- 计划入口 -->
     <view class="x-section-title">
@@ -341,10 +339,6 @@ function revealAll() {
   expanded.value = true;
 }
 
-function handleShare() {
-  uni.showToast({ title: '已生成今日成果，可在分享面板发送', icon: 'none' });
-}
-
 function handleUndo(entry: DoseEntry) {
   medicineStore.undo(entry.key);
   uni.showToast({ title: '已撤销打卡', icon: 'none' });
@@ -401,7 +395,8 @@ function stopTimer() {
 }
 
 onLoad(() => {
-  expanded.value = false;
+  // 原型 11 时间轴三条全部展示（含 08:31 已服用 · 撤销）
+  expanded.value = true;
 });
 
 onShow(async () => {
@@ -588,14 +583,15 @@ onUnload(stopTimer);
 
 .med-party__title {
   display: block;
-  margin: 20rpx 0 8rpx;
-  font-size: 40rpx;
+  margin: 24rpx 0 12rpx;
+  font-size: 44rpx;
   font-weight: 700;
   color: var(--color-text);
 }
 
 .med-party__sub {
   display: block;
+  padding: 0 60rpx;
   font-size: var(--fs-sub);
   line-height: 1.7;
   color: var(--color-text-sub);
@@ -606,22 +602,28 @@ onUnload(stopTimer);
   color: var(--color-primary);
 }
 
+/* 原型 11b 复盘行：标准 .row（11px 0 + 分割线） */
 .med-party__row {
   display: flex;
-  gap: 16rpx;
+  gap: 20rpx;
   align-items: center;
-  padding: 10rpx 0;
+  padding: 22rpx 0;
+  border-bottom: 2rpx solid var(--color-divider);
+
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .med-party__check {
-  font-size: 32rpx;
+  font-size: 36rpx;
   color: var(--color-success);
 }
 
 .med-party__text {
   flex: 1;
   min-width: 0;
-  font-size: var(--fs-sub);
+  font-size: 26rpx;
   color: var(--color-text);
   text-align: left;
 }
@@ -647,9 +649,10 @@ onUnload(stopTimer);
 .med-tl-card {
   padding: 20rpx 24rpx;
   background: var(--color-card);
-  border: 2rpx solid transparent;
+  border: 3rpx solid transparent;
   border-radius: var(--radius-cell);
   box-shadow: var(--shadow-card);
+  transition: border-color var(--dur-normal) var(--ease-out);
 }
 
 .med-tl-card.on {
@@ -671,7 +674,7 @@ onUnload(stopTimer);
 
 .med-tl-card__t2 {
   margin-top: 4rpx;
-  font-size: var(--fs-caption);
+  font-size: var(--fs-sub);
   line-height: 1.6;
   color: var(--color-text-sub);
 }

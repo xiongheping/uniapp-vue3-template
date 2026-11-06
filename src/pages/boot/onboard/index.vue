@@ -5,9 +5,6 @@
       <view class="stepper">
         <view v-for="(s, i) in steps" :key="s.key" class="stepper__bar" :class="{ on: s.done || i === currentIdx }" />
       </view>
-      <view class="progress-text">
-        {{ progressText }}
-      </view>
 
       <!-- 当前步骤 -->
       <block v-if="currentIdx >= 0">
@@ -100,23 +97,26 @@
       </block>
     </view>
 
-    <!-- 06b 相机权限被拒 -->
-    <x-sheet
-      v-model:show="permSheet"
-      title="相机权限未开启"
-      sub="拍照识别需要相机权限。你也可以先用手动输入或扫条码，不影响添加物品。"
-    >
-      <view class="perm-path">
+    <!-- 06b 相机权限被拒（原型为全屏态，非弹层） -->
+    <view v-if="permSheet" class="perm">
+      <view class="perm__emoji">
+        📷🚫
+      </view>
+      <view class="perm__title">
+        相机权限未开启
+      </view>
+      <view class="perm__sub">
+        拍照识别需要相机权限。你也可以先用手动输入或扫条码，不影响添加物品。
+      </view>
+      <view class="perm__btns">
+        <x-button text="去设置开启相机" @click="openSetting" />
+        <x-button type="ghost" text="手动输入" @click="altAdd('keyboard')" />
+        <x-button type="ghost" text="扫商品条码" @click="altAdd('scan')" />
+      </view>
+      <view class="perm__path">
         设置路径：系统设置 › 小七管家 › 相机
       </view>
-      <x-button text="去设置开启相机" @click="openSetting" />
-      <view class="perm-alt">
-        <x-button type="ghost" text="手动输入" @click="altAdd('keyboard')" />
-      </view>
-      <view class="perm-alt">
-        <x-button type="gray" text="取消" @click="permSheet = false" />
-      </view>
-    </x-sheet>
+    </view>
   </x-page>
 </template>
 
@@ -141,13 +141,6 @@ const steps = ref<OnboardStep[]>([
 const permSheet = ref(false);
 
 const currentIdx = computed(() => steps.value.findIndex(s => !s.done));
-const progressText = computed(() => {
-  if (currentIdx.value < 0) {
-    return '已完成全部 3 步';
-  }
-  return `第 ${currentIdx.value + 1} / ${steps.value.length} 步`;
-});
-
 function markDone(key: string) {
   const target = steps.value.find(s => s.key === key);
   if (target) {
@@ -241,13 +234,6 @@ function enterHome() {
   background: var(--color-primary);
 }
 
-.progress-text {
-  margin-bottom: 16rpx;
-  font-size: var(--fs-caption);
-  color: var(--color-text-sub);
-  text-align: right;
-}
-
 .head {
   padding: 16rpx 0 24rpx;
   text-align: center;
@@ -296,14 +282,48 @@ function enterHome() {
   color: var(--color-text-weak);
 }
 
-.perm-path {
-  padding: 8rpx 0 28rpx;
-  font-size: var(--fs-mini);
-  color: var(--color-text-sub);
+.perm {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 56rpx;
   text-align: center;
+  background: var(--color-bg);
 }
 
-.perm-alt {
-  margin-top: 16rpx;
+.perm__emoji {
+  font-size: 120rpx;
+  line-height: 1;
+}
+
+.perm__title {
+  margin: 28rpx 0 16rpx;
+  font-size: 38rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.perm__sub {
+  font-size: var(--fs-body);
+  line-height: 1.8;
+  color: var(--color-text-sub);
+}
+
+.perm__btns {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  width: 100%;
+  margin-top: 44rpx;
+}
+
+.perm__path {
+  margin-top: 28rpx;
+  font-size: var(--fs-mini);
+  color: var(--color-text-sub);
 }
 </style>

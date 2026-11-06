@@ -4,7 +4,7 @@
     <view class="xnb__bar">
       <view class="xnb__side">
         <slot name="left">
-          <view v-if="back" class="xnb__back" @tap="handleBack">
+          <view v-if="back" class="xnb__back x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="handleBack">
             <x-icon :name="back === 'close' ? 'x' : 'arrow-l'" :size="44" :color="navColor" />
           </view>
         </slot>
@@ -14,10 +14,10 @@
       </text>
       <view class="xnb__side xnb__side--right">
         <slot name="right">
-          <view v-if="rightIcon" class="xnb__act" @tap="emit('right')">
+          <view v-if="rightIcon" class="xnb__act x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="emit('right')">
             <x-icon :name="rightIcon" :size="40" :color="navColor" />
           </view>
-          <text v-else-if="rightText" class="xnb__act-text" @tap="emit('right')">
+          <text v-else-if="rightText" class="xnb__act-text x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="emit('right')">
             {{ rightText }}
           </text>
         </slot>
@@ -76,7 +76,7 @@ function handleBack() {
   align-items: center;
   justify-content: space-between;
   min-height: 88rpx;
-  padding: 0 24rpx;
+  padding: 0 32rpx;
 }
 
 .xnb__side {
@@ -98,7 +98,7 @@ function handleBack() {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: var(--fs-nav);
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 

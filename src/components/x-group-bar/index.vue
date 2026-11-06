@@ -3,7 +3,7 @@
     <text class="xgb__title">
       {{ title }}
     </text>
-    <text v-if="more" class="xgb__more" @tap="emit('more')">
+    <text v-if="more" class="xgb__more x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="emit('more')">
       {{ more }}
     </text>
   </view>

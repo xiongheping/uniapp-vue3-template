@@ -9,11 +9,86 @@ import type {
   MergeStrategy,
 } from './types';
 import { defineStore } from 'pinia';
-import { diffDays, today } from '@/utils/date';
+import { addDays, diffDays, today } from '@/utils/date';
 import storage from '@/utils/storage';
 
 /** 物品列表持久化键 */
 const ITEM_LIST_KEY = 'item_list';
+
+/** 演示数据总开关：仅为「首次启动即能看到 07 首页默认态」服务，接真实接口时置 false */
+const DEMO_ENABLED = true;
+
+/** 演示数据已注入标记（只注入一次） */
+const SEED_KEY = 'item_demo_seeded';
+
+/**
+ * 演示物品（offset = 相对今天的到期天数）
+ * 覆盖三组：已过期 1 件 / 临期 5 件 / 安全 6 件，与原型 07 的分组口径一致
+ */
+const DEMO_ROWS: {
+  name: string;
+  category: ItemCategory;
+  location: string;
+  offset: number;
+  qty: number;
+  /** 归档态演示（原型 19：已用完 / 已扔） */
+  status?: ItemRecord['status'];
+}[] = [
+  { name: '连花清瘟胶囊', category: 'drug', location: '药箱左侧', offset: -18, qty: 1 },
+  { name: '兰蔻小黑瓶精华面膜', category: 'skin', location: '梳妆台第二层', offset: 3, qty: 3 },
+  { name: '阿莫西林胶囊', category: 'drug', location: '药箱左侧', offset: 7, qty: 2 },
+  { name: '布洛芬缓释胶囊', category: 'drug', location: '药箱右侧', offset: 12, qty: 1 },
+  { name: '蒙牛纯牛奶', category: 'food', location: '冰箱门侧', offset: 18, qty: 6 },
+  { name: '修丽可 CE 精华', category: 'skin', location: '梳妆台第一层', offset: 27, qty: 1 },
+  { name: '维生素 C 泡腾片', category: 'drug', location: '药箱左侧', offset: 46, qty: 1 },
+  { name: '雅诗兰黛小棕瓶', category: 'skin', location: '梳妆台第一层', offset: 92, qty: 1 },
+  { name: '云南白药创可贴', category: 'other', location: '玄关抽屉', offset: 150, qty: 1 },
+  { name: '蒙脱石散', category: 'drug', location: '药箱右侧', offset: 210, qty: 5 },
+  { name: '医用外科口罩', category: 'other', location: '玄关抽屉', offset: 280, qty: 20 },
+  { name: '奥利奥饼干', category: 'food', location: '零食柜', offset: 365, qty: 2 },
+  // 以下补齐「✓ 安全 · 23」口径（原型 07 tile 数字），全部 > 30 天
+  { name: '泰诺感冒片', category: 'drug', location: '药箱右侧', offset: 52, qty: 1 },
+  { name: '999 感冒灵颗粒', category: 'drug', location: '药箱左侧', offset: 61, qty: 3 },
+  { name: '藿香正气水', category: 'drug', location: '药箱右侧', offset: 74, qty: 4 },
+  { name: '金嗓子喉片', category: 'drug', location: '药箱左侧', offset: 83, qty: 2 },
+  { name: '维达抽纸', category: 'other', location: '客厅储物柜', offset: 96, qty: 12 },
+  { name: '海露玻璃酸钠滴眼液', category: 'drug', location: '书桌抽屉', offset: 108, qty: 1 },
+  { name: '妮维雅身体乳', category: 'skin', location: '浴室置物架', offset: 121, qty: 1 },
+  { name: '舒肤佳洗手液', category: 'other', location: '浴室置物架', offset: 134, qty: 1 },
+  { name: '金龙鱼食用油', category: 'food', location: '厨房下柜', offset: 146, qty: 1 },
+  { name: '海天生抽', category: 'food', location: '厨房下柜', offset: 158, qty: 1 },
+  { name: '安耐晒防晒霜', category: 'skin', location: '梳妆台第二层', offset: 172, qty: 1 },
+  { name: '珂润面霜', category: 'skin', location: '梳妆台第一层', offset: 188, qty: 1 },
+  { name: '云南白药膏', category: 'drug', location: '药箱右侧', offset: 203, qty: 1 },
+  { name: '农夫山泉矿泉水', category: 'food', location: '阳台储物架', offset: 226, qty: 24 },
+  { name: '滴露消毒液', category: 'other', location: '卫生间下柜', offset: 249, qty: 1 },
+  { name: '六神花露水', category: 'other', location: '阳台储物架', offset: 268, qty: 1 },
+  { name: '帮宝适湿巾', category: 'other', location: '婴儿房抽屉', offset: 292, qty: 6 },
+  // 归档演示：让原型 19（归档与历史）有内容
+  { name: '薇诺娜防晒霜', category: 'skin', location: '梳妆台第二层', offset: -5, qty: 0, status: 'used' },
+  { name: '复方甘草片', category: 'drug', location: '药箱右侧', offset: -120, qty: 0, status: 'thrown' },
+];
+
+/**
+ * 生成演示物品；仅在 item_list 从未写入过时调用（用户清空后不再重新注入）
+ */
+function seedDemoItems(): ItemRecord[] {
+  return DEMO_ROWS.map((row, index): ItemRecord => ({
+    id: `i-demo-${index + 1}`,
+    name: row.name,
+    category: row.category,
+    qty: row.qty,
+    location: row.location,
+    produceDate: addDays(row.offset - 365),
+    dueDate: addDays(row.offset),
+    remindDays: [7, 3, 0],
+    visibility: 'family',
+    isDrug: row.category === 'drug',
+    status: row.status || 'active',
+    createdAt: addDays(-(DEMO_ROWS.length - index)),
+    updatedAt: today(),
+  }));
+}
 
 /** 分类清单（确认页 chips / 图标映射共用） */
 export const CATEGORIES: { key: ItemCategory; label: string; icon: string }[] = [
@@ -89,6 +164,22 @@ const useItemStore = defineStore('item', {
     },
   },
   actions: {
+    /**
+     * 首启动注入演示数据（原型 07 默认态需要列表内容）
+     * 只注入一次：SEED_KEY 写入后，即使用户把物品全部清空也不会再次生成
+     */
+    ensureSeedDemo() {
+      if (!DEMO_ENABLED || storage.get(SEED_KEY) === '1') {
+        return;
+      }
+      storage.set(SEED_KEY, '1');
+      if (this.list.length > 0) {
+        return;
+      }
+      this.list = seedDemoItems();
+      this.persist();
+    },
+
     persist() {
       storage.setJSON(ITEM_LIST_KEY, this.list);
     },

@@ -23,8 +23,8 @@ export default function useLocation() {
   // 历史位置
   const historyLocations = ref<LocationInfo[]>([]);
 
-  // 监听位置的定时器ID
-  let watchId: number | null = null;
+  // 监听位置的定时器ID（uni 全局 setInterval，H5/小程序通用）
+  let watchId: ReturnType<typeof setInterval> | null = null;
 
   /**
    * 获取当前位置
@@ -162,8 +162,8 @@ export default function useLocation() {
       console.error('监听位置首次定位失败', err);
     });
 
-    // 定时获取位置
-    watchId = window.setInterval(() => {
+    // 定时获取位置（禁用 window.setInterval：小程序端无 window）
+    watchId = setInterval(() => {
       if (isWatching.value) {
         getLocation(options).catch((err) => {
           console.error('监听位置更新失败', err);

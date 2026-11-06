@@ -1,7 +1,12 @@
 <template>
   <button
     class="x-button"
-    :class="[`x-button--${type}`, { 'x-button--small': small, 'x-button--mini': mini, 'x-button--disabled': disabled }]"
+    :class="[
+      `x-button--${type}`,
+      { 'x-button--small': small, 'x-button--mini': mini, 'x-button--large': large, 'x-button--disabled': disabled },
+    ]"
+    hover-class="x-button--hover"
+    :hover-start-time="0"
     :disabled="disabled"
     @tap="onTap"
   >
@@ -22,6 +27,7 @@ interface Props {
   icon?: string;
   small?: boolean;
   mini?: boolean;
+  large?: boolean;
   disabled?: boolean;
 }
 
@@ -31,6 +37,7 @@ const props = withDefaults(defineProps<Props>(), {
   icon: '',
   small: false,
   mini: false,
+  large: false,
   disabled: false,
 });
 
@@ -50,15 +57,22 @@ function onTap() {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: var(--h-touch);
+  min-height: var(--h-btn);
   margin-top: 24rpx;
-  font-size: var(--fs-body);
+  font-size: var(--fs-btn);
   font-weight: 600;
   text-align: center;
   border-radius: var(--radius-cell);
-  transition: transform 0.12s;
+  transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-normal) var(--ease-out);
 
   &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+
+  /* hover-class 按压态（小程序/H5 通用） */
+  &.x-button--hover {
+    opacity: 0.9;
     transform: scale(0.98);
   }
 
@@ -76,7 +90,7 @@ function onTap() {
   &.x-button--danger {
     color: var(--color-danger);
     background: var(--color-card);
-    border: 3rpx solid #fbcbeb;
+    border: 3rpx solid #fbcbcb;
   }
 
   &.x-button--gray {
@@ -85,7 +99,7 @@ function onTap() {
   }
 
   &.x-button--link {
-    min-height: var(--h-touch);
+    min-height: var(--h-btn);
     font-weight: 600;
     color: var(--color-primary);
     background: transparent;
@@ -95,6 +109,12 @@ function onTap() {
     min-height: 72rpx;
     margin-top: 0;
     font-size: var(--fs-sub);
+  }
+
+  /* 原型 13 主 CTA：56px 高 / 17px 字号；elder 60px（--h-btn-lg） */
+  &.x-button--large {
+    min-height: var(--h-btn-lg);
+    font-size: var(--fs-btn-lg);
   }
 
   &.x-button--mini {
@@ -107,8 +127,7 @@ function onTap() {
   &.x-button--disabled {
     color: #ffffff;
     pointer-events: none;
-    background: var(--color-fill);
-    opacity: 0.8;
+    background: var(--color-disabled-bg);
   }
 }
 </style>

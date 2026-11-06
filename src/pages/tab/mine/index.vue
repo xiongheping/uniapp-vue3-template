@@ -16,7 +16,7 @@
             {{ idSubText }}
           </view>
         </view>
-        <view @tap="handleEdit">
+        <view class="x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="handleEdit">
           <x-tag type="blue">
             编辑
           </x-tag>
@@ -36,20 +36,13 @@
             {{ memberDesc }} · 云同步{{ settingStore.isMember ? '已开启' : '未开启' }}
           </view>
         </view>
-        <text class="mine-member__btn" @tap="goMember">
+        <text class="mine-member__btn x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="goMember">
           {{ settingStore.isMember ? '管理中' : '升级' }}
         </text>
       </view>
-      <view class="mine-quota">
-        <view class="mine-quota__label">
-          <text>本月 AI 剩余额度</text>
-          <text>{{ settingStore.quotaLeftText }}</text>
-        </view>
-        <x-progress :percent="quotaPercent" />
-      </view>
     </view>
 
-    <!-- 家庭 / 归档入口 -->
+    <!-- 家庭 / 归档入口（原型 16：仅 3 项） -->
     <x-card>
       <x-cell
         icon="archive"
@@ -59,14 +52,6 @@
         @click="goArchive"
       />
       <x-cell icon="users" title="家庭与隐私" subtitle="3 位成员 · 默认仅自己可见" chevron @click="goFamily" />
-      <x-cell
-        icon="crown"
-        tone="purple"
-        title="会员方案"
-        :subtitle="settingStore.isMember ? '会员生效中' : '免费版 · 升级解锁云同步与报表'"
-        chevron
-        @click="goMember"
-      />
       <x-cell icon="eye-off" title="长辈模式" subtitle="大字号 · 大按钮 · 简化导航" last>
         <template #right>
           <x-switch :checked="settingStore.isElder" @change="handleElder" />
@@ -74,9 +59,8 @@
       </x-cell>
     </x-card>
 
-    <!-- 数据 / 设置入口 -->
+    <!-- 数据 / 合规 / 账号（原型 16 第二张卡） -->
     <x-card>
-      <x-cell icon="settings" title="设置" subtitle="外观 · 隐私与权限 · 删除数据" chevron @click="goSetting" />
       <x-cell
         icon="cloud"
         title="数据与备份"
@@ -84,7 +68,6 @@
         chevron
         @click="goRestore"
       />
-      <x-cell icon="bell" title="消息频控" subtitle="标准 · 约 3 条/天" chevron @click="goFrequency" />
       <x-cell icon="chart" title="消耗统计" subtitle="月度浪费报表 · 会员功能">
         <template #right>
           <x-tag type="orange">
@@ -93,13 +76,25 @@
         </template>
       </x-cell>
       <x-cell
+        icon="file"
+        title="个人信息收集清单"
+        subtitle="查看收集项、用途与第三方共享"
+        chevron
+        @click="handleCollectList"
+      />
+      <x-cell
         icon="info"
-        title="帮助 / 关于"
+        title="关于与协议"
         subtitle="v1.0.0 · 隐私政策 · 用户协议"
         chevron
-        last
         @click="handleAbout"
       />
+      <x-cell icon="logout" tone="red" title="注销账号" subtitle="删除账号与全部关联数据" chevron last @click="handleLogout" />
+    </x-card>
+
+    <!-- 必要入口（原型未画，设置页承载外观/隐私/删除数据） -->
+    <x-card>
+      <x-cell icon="settings" title="设置" subtitle="外观 · 隐私与权限 · 删除数据" chevron last @click="goSetting" />
     </x-card>
   </x-page>
 </template>
@@ -149,11 +144,6 @@ const memberDesc = computed(() =>
     : `本月 AI 剩余 ${settingStore.quotaLeft} 次（共 ${settingStore.quotaTotal} 次）`,
 );
 
-const quotaPercent = computed<number>(() => {
-  const total = settingStore.quotaTotal || 10;
-  return Number(((settingStore.quotaUsed / total) * 100).toFixed(0));
-});
-
 const archiveStats = computed(() => ({
   used: itemStore.stats.used,
   thrown: itemStore.stats.thrown,
@@ -177,9 +167,6 @@ function goSetting() {
 function goRestore() {
   go('/pages/user/restore/index');
 }
-function goFrequency() {
-  go('/pages/msg/frequency/index');
-}
 function goArchive() {
   go('/pages/item/archive/index');
 }
@@ -196,8 +183,48 @@ function handleAbout() {
   uni.showToast({ title: '小七管家 v1.0.0', icon: 'none' });
 }
 
+/** 个人信息收集清单：合规入口（当前无独立页，先提示） */
+function handleCollectList() {
+  uni.showModal({
+    title: '个人信息收集清单',
+    content: '账号信息（手机号）、物品与用药记录、识别图片。仅用于核心功能，不向第三方共享，敏感数据单独授权。',
+    showCancel: false,
+    confirmText: '我知道了',
+  });
+}
+
+/** 注销账号：二次确认（原型 20b 同口径的强确认） */
+function handleLogout() {
+  uni.showModal({
+    title: '注销账号？',
+    content: '将删除账号与全部关联数据，且不可恢复。本机数据会立即清除。',
+    confirmText: '继续',
+    confirmColor: '#D93025',
+    success: (res) => {
+      if (!res.confirm) {
+        return;
+      }
+      uni.showModal({
+        title: '确认注销',
+        content: '此操作不可撤销。建议先导出备份。',
+        confirmText: '确认注销',
+        confirmColor: '#D93025',
+        success: (second) => {
+          if (second.confirm) {
+            uni.showToast({ title: '已提交注销申请', icon: 'none' });
+          }
+        },
+      });
+    },
+  });
+}
+
 function handleElder(value: boolean) {
   settingStore.setElder(value);
+  // 开启后进入长辈模式首页（原型 24）
+  if (value) {
+    uni.navigateTo({ url: '/pages/user/elder/index' });
+  }
 }
 
 onShow(async () => {
@@ -265,27 +292,5 @@ onShow(async () => {
   font-weight: 600;
   background: var(--color-warning-strong);
   border-radius: 28rpx;
-}
-
-.mine-quota {
-  padding-top: 20rpx;
-  margin-top: 24rpx;
-  border-top: 2rpx solid rgb(255 255 255 / 18%);
-}
-
-.mine-quota__label {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12rpx;
-  font-size: 22rpx;
-  opacity: 0.85;
-}
-
-.mine-quota :deep(.x-progress) {
-  background: rgb(255 255 255 / 20%);
-}
-
-.mine-quota :deep(.x-progress__bar) {
-  background: #ffffff;
 }
 </style>
