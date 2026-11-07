@@ -89,7 +89,7 @@
         chevron
         @click="handleAbout"
       />
-      <x-cell icon="logout" tone="red" title="注销账号" subtitle="删除账号与全部关联数据" chevron last @click="handleLogout" />
+      <x-cell icon="logout" tone="red" title="退出登录" subtitle="清除本机登录状态" chevron last @click="handleLogout" />
     </x-card>
 
     <!-- 必要入口（原型未画，设置页承载外观/隐私/删除数据） -->
@@ -113,12 +113,12 @@ const medicineStore = useMedicineStore();
 const userStore = useUserStore();
 
 const isGuest = computed<boolean>(() => uni.getStorageSync(GUEST_KEY) === true);
-// 已登录判定改走 B 的 token 存储（@/utils/auth）
+// 已登录判定走 token 存储（@/utils/auth）
 const loggedIn = computed<boolean>(() => isLogin());
 
 const nickname = computed<string>(() => {
-  if (loggedIn.value && userStore.user_name) {
-    return userStore.user_name;
+  if (loggedIn.value && userStore.nickname) {
+    return userStore.nickname;
   }
   if (isGuest.value) {
     return '游客';
@@ -126,7 +126,7 @@ const nickname = computed<string>(() => {
   return settingStore.nickname;
 });
 
-// 判断依据：已登录看 token，游客进入看 guest_mode，其余为未登录
+// 判断依据：已登录显示后端脱敏手机号/账号类型，游客进入看 guest_mode，其余为未登录
 const idSubText = computed<string>(() => {
   if (!loggedIn.value && isGuest.value) {
     return '游客进入 · 数据仅存本机，登录后可合并';
@@ -134,8 +134,10 @@ const idSubText = computed<string>(() => {
   if (!loggedIn.value && !isGuest.value) {
     return '未登录 · 登录后可跨设备同步';
   }
-  // B 的 UserState 未存手机号，页面内直接用原型的脱敏号
-  return '138****1234 · 家庭创建者';
+  if (userStore.guest) {
+    return '游客账号 · 数据云端保存';
+  }
+  return `${userStore.phone || '未绑定手机号'} · ${'家庭创建者'}`;
 });
 
 const memberDesc = computed(() =>
@@ -193,28 +195,27 @@ function handleCollectList() {
   });
 }
 
-/** 注销账号：二次确认（原型 20b 同口径的强确认） */
+/** 退出登录：真实吊销令牌（grant jti 失效）并清空本地状态 */
 function handleLogout() {
   uni.showModal({
-    title: '注销账号？',
-    content: '将删除账号与全部关联数据，且不可恢复。本机数据会立即清除。',
-    confirmText: '继续',
+    title: '退出登录？',
+    content: '退出后需重新登录才能同步数据，本机数据不受影响。',
+    confirmText: '退出',
     confirmColor: '#D93025',
-    success: (res) => {
+    success: async (res) => {
       if (!res.confirm) {
         return;
       }
-      uni.showModal({
-        title: '确认注销',
-        content: '此操作不可撤销。建议先导出备份。',
-        confirmText: '确认注销',
-        confirmColor: '#D93025',
-        success: (second) => {
-          if (second.confirm) {
-            uni.showToast({ title: '已提交注销申请', icon: 'none' });
-          }
-        },
-      });
+      try {
+        await userStore.logout();
+        uni.showToast({ title: '已退出登录', icon: 'none' });
+        setTimeout(() => {
+          uni.reLaunch({ url: '/pages/common/login/index' });
+        }, 600);
+      }
+      catch {
+        uni.showToast({ title: '退出失败，请重试', icon: 'none' });
+      }
     },
   });
 }
@@ -230,6 +231,10 @@ function handleElder(value: boolean) {
 onShow(async () => {
   // tab 页需在 onShow 兜底权限拦截：未登录时 hasPerm 会跳登录页并带 ?redirect=
   await usePermission();
+  // 已登录则刷新会员信息（静默，失败不提示——401 由请求层统一续期/重登）
+  if (isLogin() && !userStore.hasInfo) {
+    userStore.fetchInfo().catch(() => {});
+  }
 });
 </script>
 

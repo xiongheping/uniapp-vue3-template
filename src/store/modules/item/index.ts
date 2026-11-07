@@ -8,7 +8,10 @@ import type {
   MergeResult,
   MergeStrategy,
 } from './types';
+import type { ItemCategoryVo, ItemVo } from '@/api/xiaoqi/item';
 import { defineStore } from 'pinia';
+import { ItemApi } from '@/api';
+import { isLogin } from '@/utils/auth';
 import { addDays, diffDays, today } from '@/utils/date';
 import storage from '@/utils/storage';
 
@@ -101,8 +104,96 @@ export const CATEGORIES: { key: ItemCategory; label: string; icon: string }[] = 
 /** 临期窗口（天）：0~30 天视为临期 */
 const EXPIRING_WINDOW = 30;
 
-/** 游客模式标记键（登录页「先逛逛」写入） */
-const GUEST_KEY = 'guest_mode';
+/* ==================== 云端映射（XqItemController /xiaoqi/item） ==================== */
+
+/** 云端状态：0在用 1已用完 2已扔 3回收站 */
+const CLOUD_VISIBLE: Record<ItemRecord['visibility'], number> = { self: 0, family: 1 };
+const STATUS_TO_CLOUD: Record<ItemRecord['status'], number> = { active: 0, used: 1, thrown: 2, trashed: 3 };
+const STATUS_FROM_CLOUD: Record<number, ItemRecord['status']> = { 0: 'active', 1: 'used', 2: 'thrown', 3: 'trashed' };
+
+/** 云端分类缓存：categoryId ↔ 本地分类 key 的桥接依赖 categoryName 与本地 CATEGORIES label 一致（系统内置分类） */
+const categoryCache: { list: ItemCategoryVo[]; loading: Promise<void> | null } = { list: [], loading: null };
+
+/** 拉取分类表（并发去重；失败静默，映射回退 other / 本地兜底） */
+function loadCategoryCache(): Promise<void> {
+  if (!categoryCache.loading) {
+    categoryCache.loading = ItemApi.category.list(undefined, { custom: { toast: false } as any })
+      .then((res) => {
+        categoryCache.list = res.rows || [];
+      })
+      .catch((error) => {
+        console.warn('item category cache failed:', error);
+      })
+      .finally(() => {
+        categoryCache.loading = null;
+      });
+  }
+  return categoryCache.loading;
+}
+
+function categoryKeyById(categoryId?: number | string): ItemCategory {
+  if (categoryId === undefined || categoryId === null) {
+    return 'other';
+  }
+  const vo = categoryCache.list.find(c => String(c.id) === String(categoryId));
+  return vo ? (CATEGORIES.find(local => local.label === vo.categoryName)?.key || 'other') : 'other';
+}
+
+function categoryIdByKey(key: ItemCategory): number | string | undefined {
+  const label = CATEGORIES.find(c => c.key === key)?.label;
+  if (!label) {
+    return undefined;
+  }
+  return categoryCache.list.find(c => c.categoryName === label)?.id;
+}
+
+/** XqItemVo → 本地 ItemRecord */
+function fromCloud(vo: ItemVo): ItemRecord {
+  const created = vo.createTime?.slice(0, 10) || today();
+  const archived = vo.archiveTime?.slice(0, 10);
+  return {
+    id: String(vo.id),
+    name: vo.itemName,
+    category: categoryKeyById(vo.categoryId),
+    qty: Number(vo.quantity) || 0,
+    location: vo.location || undefined,
+    produceDate: vo.productionDate || undefined,
+    dueDate: vo.dueDate || undefined,
+    // 后端为单档提前提醒天数，本地多档 UI 取首档存取
+    remindDays: vo.expiryReminderDays != null ? [vo.expiryReminderDays] : [],
+    visibility: vo.visibleScope === 0 ? 'self' : 'family',
+    isDrug: vo.isMedication === 1,
+    status: STATUS_FROM_CLOUD[vo.status ?? 0] || 'active',
+    guest: false,
+    createdAt: created,
+    updatedAt: vo.updateTime?.slice(0, 10) || created,
+    archivedAt: archived,
+    trashedAt: vo.recycleTime?.slice(0, 10),
+    usedDays: archived && created ? Math.max(0, diffDays(archived) - diffDays(created)) : undefined,
+  };
+}
+
+/** 本地记录/草稿 → XqItemBo（后端 edit 校验 categoryId/itemName 必填，须传全量） */
+function toCloudBo(it: Partial<ItemRecord> & Partial<ItemDraft>): Partial<ItemVo> {
+  return {
+    categoryId: it.category ? categoryIdByKey(it.category) : undefined,
+    itemName: it.name,
+    // 判重用归一化名称；后端 insertBy 当前未自动生成（NOT NULL），前端兜底传入
+    normalizedName: it.name ? it.name.trim().toLowerCase() : undefined,
+    productionDate: it.produceDate,
+    dueDate: it.dueDate,
+    quantity: it.qty,
+    location: it.location,
+    visibleScope: it.visibility ? CLOUD_VISIBLE[it.visibility] : undefined,
+    isMedication: it.isDrug === undefined ? undefined : (it.isDrug ? 1 : 0),
+    // 后端为单档提前提醒天数，多档 UI 取首档
+    expiryReminderDays: Array.isArray(it.remindDays) ? it.remindDays[0] : undefined,
+    status: it.status ? STATUS_TO_CLOUD[it.status] : undefined,
+  };
+}
+
+/** fetchList 进行中的请求（并发去重） */
+let fetchListTask: Promise<void> | null = null;
 
 function nowId(): string {
   return `i${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -115,6 +206,11 @@ const useItemStore = defineStore('item', {
     selectedIds: [] as string[],
   }),
   getters: {
+    /** 云端模式：有令牌即走 /xiaoqi/item（游客账号同样云端保存）；无令牌降级本地模式 */
+    isCloudMode(): boolean {
+      return isLogin();
+    },
+
     /** 在用物品（含无到期日），按到期日升序；关键字过滤 */
     filtered(state): ItemView[] {
       const kw = state.keyword.trim().toLowerCase();
@@ -165,11 +261,61 @@ const useItemStore = defineStore('item', {
   },
   actions: {
     /**
-     * 首启动注入演示数据（原型 07 默认态需要列表内容）
+     * 拉取云端物品列表（XqItemController GET /xiaoqi/item/list）。
+     * 云端数据覆盖本地（登录前新增的本地游客条目保留，待合并流程上传）；失败静默，保持本地数据。
+     */
+    fetchList(): Promise<void> {
+      if (!this.isCloudMode) {
+        return Promise.resolve();
+      }
+      if (fetchListTask) {
+        return fetchListTask;
+      }
+      fetchListTask = (async () => {
+        try {
+          await loadCategoryCache();
+          const res = await ItemApi.list({ pageNum: 1, pageSize: 500 });
+          const remote = (res.rows || []).map(fromCloud);
+          const localGuest = this.list.filter(it => it.guest === true);
+          this.list = [...remote, ...localGuest];
+          this.persist();
+        }
+        catch (error) {
+          console.warn('item fetchList failed:', error);
+        }
+        finally {
+          fetchListTask = null;
+        }
+      })();
+      return fetchListTask;
+    },
+
+    /**
+     * 云端更新单个条目（fire-and-forget）：仅同步有后端 id 的条目，全量字段（edit 校验必填），
+     * 失败静默（请求拦截器已 toast），下次 fetchList 以云端为准
+     */
+    syncUpdate(id: string) {
+      if (!this.isCloudMode || !/^\d+$/.test(id)) {
+        return;
+      }
+      const target = this.list.find(it => it.id === id);
+      if (!target) {
+        return;
+      }
+      const bo = toCloudBo(target);
+      if (bo.categoryId === undefined) {
+        console.warn(`item cloud sync skipped (categoryId missing): ${target.name}`);
+        return;
+      }
+      ItemApi.update({ id, ...bo }).catch(error => console.warn('item cloud sync failed:', error));
+    },
+
+    /**
+     * 首启动注入演示数据（仅本地模式；原型 07 默认态需要列表内容）
      * 只注入一次：SEED_KEY 写入后，即使用户把物品全部清空也不会再次生成
      */
     ensureSeedDemo() {
-      if (!DEMO_ENABLED || storage.get(SEED_KEY) === '1') {
+      if (this.isCloudMode || !DEMO_ENABLED || storage.get(SEED_KEY) === '1') {
         return;
       }
       storage.set(SEED_KEY, '1');
@@ -189,24 +335,35 @@ const useItemStore = defineStore('item', {
     },
 
     /**
-     * 新增物品：未登录 / 游客模式下打 guest 标记，登录后参与合并
+     * 新增物品：云端模式直接上传（成功后 fetchList 换取后端 id）；
+     * 本地模式打 guest 标记，登录后参与合并
      */
     addItem(draft: ItemDraft): ItemRecord {
       const record: ItemRecord = {
         ...draft,
         id: nowId(),
         status: 'active',
-        guest: storage.get(GUEST_KEY) === true,
+        guest: !this.isCloudMode,
         createdAt: today(),
         updatedAt: today(),
       };
       this.list.unshift(record);
       this.persist();
+      if (this.isCloudMode) {
+        const bo = toCloudBo(record);
+        if (bo.categoryId === undefined) {
+          console.warn(`item cloud add skipped (categoryId missing): ${record.name}`);
+          return record;
+        }
+        ItemApi.add(bo)
+          .then(() => this.fetchList())
+          .catch(error => console.warn('item cloud add failed:', error));
+      }
       return record;
     },
 
     /**
-     * 更新物品（部分字段）；字段变更刷新 updatedAt
+     * 更新物品（部分字段）；字段变更刷新 updatedAt，云端模式同步 PUT
      */
     updateItem(id: string, patch: Partial<ItemDraft> & Partial<ItemRecord>) {
       const target = this.list.find(it => it.id === id);
@@ -215,6 +372,7 @@ const useItemStore = defineStore('item', {
       }
       Object.assign(target, patch, { updatedAt: today() });
       this.persist();
+      this.syncUpdate(id);
     },
 
     /**
@@ -222,6 +380,7 @@ const useItemStore = defineStore('item', {
      */
     archive(ids: string[], mode: ArchiveMode) {
       const idSet = new Set(ids);
+      const changed: string[] = [];
       this.list.forEach((it) => {
         if (!idSet.has(it.id) || it.status !== 'active') {
           return;
@@ -233,13 +392,16 @@ const useItemStore = defineStore('item', {
           const base = it.createdAt || today();
           it.usedDays = Math.max(0, -diffDays(base));
         }
+        changed.push(it.id);
       });
       this.persist();
+      changed.forEach(id => this.syncUpdate(id));
     },
 
     /** 恢复到在用（归档 / 回收站均可恢复） */
     restore(ids: string[]) {
       const idSet = new Set(ids);
+      const changed: string[] = [];
       this.list.forEach((it) => {
         if (idSet.has(it.id)) {
           it.status = 'active';
@@ -247,30 +409,39 @@ const useItemStore = defineStore('item', {
           it.usedDays = undefined;
           it.trashedAt = undefined;
           it.updatedAt = today();
+          changed.push(it.id);
         }
       });
       this.persist();
+      changed.forEach(id => this.syncUpdate(id));
     },
 
     /** 移入回收站（30 天保留期，到期彻底删除） */
     moveToTrash(ids: string[]) {
       const idSet = new Set(ids);
+      const changed: string[] = [];
       this.list.forEach((it) => {
         if (idSet.has(it.id)) {
           it.status = 'trashed';
           it.trashedAt = today();
           it.updatedAt = today();
+          changed.push(it.id);
         }
       });
       this.persist();
+      changed.forEach(id => this.syncUpdate(id));
     },
 
-    /** 彻底删除（仅在回收站内提供，需二次确认） */
+    /** 彻底删除（仅在回收站内提供，需二次确认）；云端模式调批量删除 */
     deleteForever(ids: string[]) {
       const idSet = new Set(ids);
+      const removed = this.list.filter(it => idSet.has(it.id) && /^\d+$/.test(it.id)).map(it => it.id);
       this.list = this.list.filter(it => !idSet.has(it.id));
       this.selectedIds = this.selectedIds.filter(id => !idSet.has(id));
       this.persist();
+      if (this.isCloudMode && removed.length) {
+        ItemApi.remove(removed).catch(error => console.warn('item cloud remove failed:', error));
+      }
     },
 
     /** 延期 N 天 */
@@ -284,6 +455,7 @@ const useItemStore = defineStore('item', {
       target.dueDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
       target.updatedAt = today();
       this.persist();
+      this.syncUpdate(id);
     },
 
     /** 批量管理：单选 / 取消 */
@@ -305,11 +477,16 @@ const useItemStore = defineStore('item', {
      * 游客数据合并（原型 26 / 备份恢复共用）
      * - merge：按名称判重，命中合并（数量取 max、可见范围取更严格方），缺到期日计待确认
      * - cloud / local：全部按来源写入，本机新增项保留
+     * 云端模式：可上传条目调 POST /xiaoqi/item，成功后移除本地副本并 fetchList 以云端为准；
+     * 上传失败或分类缺失的条目保留本地（仍带 guest 标记），可再次合并
      */
     mergeGuest(items: Partial<ItemRecord>[], strategy: MergeStrategy): MergeResult {
       let mergedCount = 0;
       let conflictCount = 0;
       let pendingCount = 0;
+
+      /** cloud 模式待上传任务：成功后按 id 移除本地副本 */
+      const uploads: { id: string; bo: Partial<ItemVo> }[] = [];
 
       items.forEach((raw) => {
         const name = String(raw.name || '').trim();
@@ -330,7 +507,7 @@ const useItemStore = defineStore('item', {
           visibility: raw.visibility || 'self',
           isDrug: raw.isDrug,
           status: 'active',
-          guest: false,
+          guest: this.isCloudMode,
           createdAt: today(),
           updatedAt: today(),
         };
@@ -343,14 +520,41 @@ const useItemStore = defineStore('item', {
           if (matched.visibility === 'family' && incoming.visibility === 'self') {
             matched.visibility = 'self';
           }
+          this.syncUpdate(matched.id);
         }
         else {
           this.list.unshift(incoming);
+          if (this.isCloudMode) {
+            const bo = toCloudBo(incoming);
+            if (bo.categoryId === undefined) {
+              console.warn(`merge upload skipped (categoryId missing): ${name}`);
+            }
+            else {
+              uploads.push({ id: incoming.id, bo });
+            }
+          }
         }
         if (!incoming.dueDate) {
           pendingCount += 1;
         }
       });
+
+      if (uploads.length) {
+        Promise.allSettled(
+          uploads.map(u => ItemApi.add(u.bo).then(() => u.id)),
+        ).then((results) => {
+          const okIds = new Set(
+            results
+              .filter(r => r.status === 'fulfilled')
+              .map(r => (r as PromiseFulfilledResult<string>).value),
+          );
+          if (okIds.size) {
+            this.list = this.list.filter(it => !okIds.has(it.id));
+            this.persist();
+          }
+          this.fetchList();
+        });
+      }
 
       this.persist();
       return { mergedCount, conflictCount, pendingCount, total: items.length };

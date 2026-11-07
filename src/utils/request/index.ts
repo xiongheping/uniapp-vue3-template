@@ -25,9 +25,8 @@ export function setupRequest() {
 export function request<T = any>(config: HttpRequestConfig): Promise<T> {
   return new Promise((resolve, reject) => {
     http.request(config).then((res: HttpResponse<IResponse<T>>) => {
-      console.log('[ res ] >', res);
-      const { result } = res.data;
-      resolve(result as T);
+      const { data } = res.data;
+      resolve(data as T);
     }).catch((err: any) => {
       console.error('[ err ] >', err);
       reject(err);
@@ -41,6 +40,14 @@ export function get<T = any>(url: string, config?: HttpRequestConfig): Promise<T
 
 export function post<T = any>(url: string, config?: HttpRequestConfig): Promise<T> {
   return request({ ...config, url, method: 'POST' });
+}
+
+export function put<T = any>(url: string, config?: HttpRequestConfig): Promise<T> {
+  return request({ ...config, url, method: 'PUT' });
+}
+
+export function del<T = any>(url: string, config?: HttpRequestConfig): Promise<T> {
+  return request({ ...config, url, method: 'DELETE' });
 }
 
 export function upload<T = any>(url: string, config?: HttpRequestConfig): Promise<T> {

@@ -1,5 +1,5 @@
 <template>
-  <view v-show="show" class="xtp__mask" @tap="onCancel">
+  <view class="xtp__mask" :class="{ 'xtp__mask--hidden': !show }" @tap="onCancel">
     <view class="xtp" @tap.stop>
       <view class="xtp__handle" />
       <view class="xtp__title">
@@ -96,6 +96,11 @@ function onCancel() {
   display: flex;
   align-items: flex-end;
   background: rgb(10 15 30 / 45%);
+}
+
+/* 小程序端 v-show 编译为 hidden 会被自身 display:flex 覆盖，显隐统一用 class 控制 */
+.xtp__mask--hidden {
+  display: none !important;
 }
 
 .xtp {

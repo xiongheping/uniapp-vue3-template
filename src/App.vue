@@ -22,6 +22,9 @@ onLaunch(() => {
   itemStore.ensureSeedDemo();
   medicineStore.ensureSeedDemo();
 
+  // 云端模式拉取物品列表（XqItemController）；本地模式静默跳过
+  itemStore.fetchList();
+
   // #ifdef MP-WEIXIN
   mpUpdate();
   // #endif

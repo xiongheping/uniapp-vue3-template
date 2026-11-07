@@ -168,15 +168,16 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app';
 import { computed, ref } from 'vue';
+import { AuthApi } from '@/api';
 import { HOME_PATH, LOGIN_PATH, removeQueryString } from '@/router';
-import { useItemStore } from '@/store';
-import { setToken } from '@/utils/auth';
+import { useItemStore, useUserStore } from '@/store';
 
 /**
  * 登录页（原型 05 / 05b / 05c / 05d）
- * 手机号 → 验证码两步；协议交互后提示；一键登录 / 社交 / 游客说明
+ * 手机号+验证码（grant_type=sms）、微信（grant_type=wechat）、游客（grant_type=guest）
  */
 const itemStore = useItemStore();
+const userStore = useUserStore();
 
 type Step = 'phone' | 'code';
 
@@ -188,6 +189,7 @@ const protocolErr = ref<boolean>(false);
 const codeStr = ref<string>('');
 const codeFocused = ref<boolean>(false);
 const codeSent = ref<boolean>(false);
+const submitting = ref<boolean>(false);
 const countdown = ref<number>(0);
 const showGuest = ref<boolean>(false);
 let redirect = HOME_PATH;
@@ -206,9 +208,9 @@ const codeDigits = computed<string[]>(() => {
 
 /** 游客能力清单（05d：能做 / 不能做） */
 const guestRows = [
-  { ok: true, k: '可以添加物品', v: '本地保存' },
-  { ok: true, k: '可以看本地数据', v: '无需登录' },
-  { ok: false, k: '云同步 / 家庭共享', v: '登录后开启' },
+  { ok: true, k: '可以添加物品', v: '游客账号云端保存' },
+  { ok: true, k: '可以看本地数据', v: '无需手机号' },
+  { ok: false, k: '家庭共享', v: '注册后开启' },
   { ok: false, k: 'AI 额度按设备计算', v: '10 次/月' },
 ];
 
@@ -228,8 +230,8 @@ function startCountdown() {
   }, 1000);
 }
 
-/** 获取验证码：错误原位提示（05b），只在交互后出现 */
-function getCode() {
+/** 获取验证码：调后端 /resource/sms/code（60s 限流），错误原位提示 */
+async function getCode() {
   if (!phoneOk.value) {
     phoneErr.value = '请输入 11 位手机号';
     return;
@@ -239,16 +241,23 @@ function getCode() {
     uni.showToast({ title: '请先阅读并同意协议', icon: 'none' });
     return;
   }
-  phoneErr.value = '13971872913';
+  phoneErr.value = '';
   protocolErr.value = false;
-  codeSent.value = true;
-  startCountdown();
-  step.value = 'code';
-  codeStr.value = '';
-  setTimeout(() => {
-    codeFocused.value = true;
-  }, 300);
-  uni.showToast({ title: '验证码已发送', icon: 'none' });
+  try {
+    const echo = await AuthApi.sendSmsCode(phone.value);
+    codeSent.value = true;
+    startCountdown();
+    step.value = 'code';
+    codeStr.value = '';
+    setTimeout(() => {
+      codeFocused.value = true;
+    }, 300);
+    // 仅后端开启回显（本地联调）时 data 为验证码
+    uni.showToast({ title: echo ? `验证码：${echo}` : '验证码已发送', icon: 'none' });
+  }
+  catch (error: any) {
+    phoneErr.value = error?.msg || '发送失败，请稍后重试';
+  }
 }
 
 function switchPhone() {
@@ -264,12 +273,18 @@ function focusCode() {
   codeFocused.value = true;
 }
 
-function resend() {
+async function resend() {
   if (countdown.value > 0) {
     return;
   }
-  startCountdown();
-  uni.showToast({ title: '验证码已重新发送', icon: 'none' });
+  try {
+    const echo = await AuthApi.sendSmsCode(phone.value);
+    startCountdown();
+    uni.showToast({ title: echo ? `验证码：${echo}` : '验证码已重新发送', icon: 'none' });
+  }
+  catch (error: any) {
+    uni.showToast({ title: error?.msg || '发送失败，请稍后重试', icon: 'none' });
+  }
 }
 
 function backToPhone() {
@@ -278,40 +293,74 @@ function backToPhone() {
 
 /** 登录成功后的分流：游客数据 → 合并页（26）；否则首页 */
 function afterLogin() {
-  setToken('mock_token');
-  const target = itemStore.guestCount > 0
-    ? `/pages/user/merge/index?redirect=${encodeURIComponent(redirect)}`
-    : redirect;
-  uni.redirectTo({ url: target });
+  // 有本地游客数据时先按 guestCount 分流；云端列表由合并流程（mergeGuest）或此处拉取
+  if (itemStore.guestCount > 0) {
+    uni.redirectTo({ url: `/pages/user/merge/index?redirect=${encodeURIComponent(redirect)}` });
+    return;
+  }
+  itemStore.fetchList();
+  uni.redirectTo({ url: redirect });
 }
 
-function verifyLogin() {
+/** 短信验证码登录（grant_type=sms，首次自动注册） */
+async function verifyLogin() {
   if (codeStr.value.length < 6) {
     uni.showToast({ title: '请输入 6 位验证码', icon: 'none' });
     return;
   }
-  // 模拟验证通过（本地演示，任意 6 位均可）
-  afterLogin();
+  if (submitting.value) {
+    return;
+  }
+  submitting.value = true;
+  try {
+    await userStore.smsLogin(phone.value, codeStr.value);
+    afterLogin();
+  }
+  catch (error: any) {
+    const msg = error?.msg || error?.message || '登录失败，请重试';
+    uni.showToast({ title: msg, icon: 'none' });
+  }
+  finally {
+    submitting.value = false;
+  }
 }
 
-/** 本机号码一键登录（运商能力，演示直接通过） */
+/** 本机号码一键登录（运营商能力，暂未开通） */
 function oneClickLogin() {
+  uni.showToast({ title: '一键登录暂未开通，请使用验证码登录', icon: 'none' });
+}
+
+/** 微信登录（grant_type=wechat，social_code 为 wx.login 的 code） */
+async function socialLogin(platform: 'wechat' | 'apple') {
+  if (platform !== 'wechat') {
+    uni.showToast({ title: 'Apple 登录暂未接入', icon: 'none' });
+    return;
+  }
   if (!agree.value) {
     protocolErr.value = true;
     uni.showToast({ title: '请先阅读并同意协议', icon: 'none' });
     return;
   }
-  afterLogin();
+  try {
+    await userStore.wechatLogin();
+    afterLogin();
+  }
+  catch (error: any) {
+    uni.showToast({ title: error?.msg || '微信登录失败', icon: 'none' });
+  }
 }
 
-function socialLogin(platform: 'wechat' | 'apple') {
-  uni.showToast({ title: `${platform === 'wechat' ? '微信' : 'Apple'}登录暂未接入`, icon: 'none' });
-}
-
-/** 游客模式：打 guest 标记后进入新手任务（06 Aha 流程） */
-function continueGuest() {
-  uni.setStorageSync('guest_mode', true);
+/** 游客模式：grant_type=guest 按设备号登录，数据云端保存 */
+async function continueGuest() {
   showGuest.value = false;
+  try {
+    await userStore.guestLogin();
+  }
+  catch (error: any) {
+    // 游客登录失败降级为纯本地模式
+    console.warn('guest login failed:', error);
+    uni.setStorageSync('guest_mode', true);
+  }
   uni.redirectTo({ url: '/pages/boot/onboard/index' });
 }
 

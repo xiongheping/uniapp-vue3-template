@@ -1,9 +1,18 @@
-export type RoleType = '' | '*' | 'user';
+import type { MemberInfo } from '@/api/auth/types';
+
+/**
+ * 用户状态
+ */
 export interface UserState {
-  user_id?: string;
-  user_name?: string;
+  memberId?: number | string;
+  /** 脱敏手机号 */
+  phone?: string;
+  nickname?: string;
   avatar?: string;
-  token?: string;
+  /** 是否游客账号 */
+  guest?: boolean;
+  /** 注册方式：0 手机号 1 微信 2 Apple 3 游客 */
+  registerType?: number;
 }
 
 export type providerType
@@ -14,3 +23,5 @@ export type providerType
     | 'apple'
     | 'univerify'
     | undefined;
+
+export type { MemberInfo };

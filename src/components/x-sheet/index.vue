@@ -1,5 +1,5 @@
 <template>
-  <view v-show="show" class="xsh__mask" :class="{ 'xsh__mask--center': mode === 'center' }" @tap="onMask">
+  <view class="xsh__mask" :class="[{ 'xsh__mask--center': mode === 'center' }, { 'xsh__mask--hidden': !show }]" @tap="onMask">
     <view class="xsh" :class="{ 'xsh--center': mode === 'center' }" @tap.stop>
       <view v-if="mode !== 'center'" class="xsh__handle" />
       <view v-if="title" class="xsh__title">
@@ -57,7 +57,7 @@ function onMask() {
 watch(
   () => props.show,
   (v) => {
-    // 弹层期间禁用页面滚动穿透，关闭后恢复（v-show 常驻 DOM，必须成对还原）
+    // 弹层期间禁用页面滚动穿透，关闭后恢复（弹层常驻 DOM，必须成对还原）
     // #ifdef H5
     document.body.style.overflow = v ? 'hidden' : '';
     // #endif
@@ -78,6 +78,11 @@ watch(
 .xsh__mask--center {
   align-items: center;
   padding: 64rpx;
+}
+
+/* 小程序端 v-show 编译为 hidden 会被自身 display:flex 覆盖，显隐统一用 class 控制 */
+.xsh__mask--hidden {
+  display: none !important;
 }
 
 .xsh {

@@ -13,6 +13,8 @@ interface ImportMetaEnv {
   VITE_API_PREFIX: string;
   /** 删除console */
   VITE_DROP_CONSOLE: string;
+  /** 客户端ID（OAuth2 client_id） */
+  VITE_CLIENT_ID: string;
 }
 
 interface ImportMeta {

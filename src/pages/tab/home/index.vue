@@ -259,10 +259,13 @@
 </template>
 
 <script setup lang="ts">
+import type { ItemCategoryVo } from '@/api/xiaoqi/item';
 import type { ItemCategory, ItemView } from '@/store/modules/item/types';
 import { onShow } from '@dcloudio/uni-app';
 import { computed, ref } from 'vue';
+import { ItemApi } from '@/api';
 import { useItemStore, useMedicineStore, useUserStore } from '@/store';
+import { CATEGORIES } from '@/store/modules/item';
 import { cnDate } from '@/utils/date';
 
 /** 首页五态：skeleton → ready / error；ready 内再分空态与默认态（原型 07~07d） */
@@ -272,7 +275,7 @@ const itemStore = useItemStore();
 const medicineStore = useMedicineStore();
 const userStore = useUserStore();
 
-const userName = computed<string>(() => userStore.user_name || '朋友');
+const userName = computed<string>(() => userStore.nickname || '朋友');
 const loadState = ref<LoadState>('skeleton');
 
 /**
@@ -296,8 +299,8 @@ const showEmpty = computed<boolean>(() => {
   return itemStore.stats.active === 0;
 });
 
-/** 分组筛选项：分类 chip 与 tile 预筛选共用 */
-type HomeFilter = 'all' | ItemCategory | 'manage' | 'expired' | 'expiring' | 'safe';
+/** 分组筛选项：'all' / 'manage' / 分组（expired/expiring/safe）/ 分类 chip key（本地分类 key 或 api-{分类id}） */
+type HomeFilter = string;
 
 const chip = ref<HomeFilter>('all');
 const sortMode = ref<'due' | 'added'>('due');
@@ -347,13 +350,29 @@ const todoStrong = computed<string>(() => {
   return '';
 });
 
-const chips = computed(() => [
-  { key: 'all' as const, label: '全部', icon: '' },
-  { key: 'drug' as const, label: '药品', icon: 'pill' },
-  { key: 'skin' as const, label: '护肤', icon: 'droplet' },
-  { key: 'food' as const, label: '食品', icon: 'cookie' },
-  { key: 'manage' as const, label: '管理分类', icon: 'sliders' },
-]);
+/** 接口分类列表（/xiaoqi/item/category/list）；null 表示未加载或加载失败，回退本地默认分类 */
+const categoryList = ref<ItemCategoryVo[] | null>(null);
+
+/** 分类 chips：全部 + 接口分类 + 管理分类 */
+const chips = computed(() => {
+  /** 接口分类按名称映射本地物品分类 key，保证列表过滤可用；无法映射时用 api-{id} 兜底 */
+  const remote = (categoryList.value || [])
+    .slice()
+    .sort((a, b) => (a.sort || 0) - (b.sort || 0))
+    .map(c => ({
+      key: CATEGORIES.find(local => local.label === c.categoryName)?.key || `api-${c.id}`,
+      label: c.categoryName,
+      icon: c.icon || '',
+    }))
+    .filter((c, i, arr) => arr.findIndex(x => x.key === c.key) === i);
+  const local = CATEGORIES.map(c => ({ key: c.key, label: c.label, icon: c.icon }));
+  const cats = remote.length ? remote : (categoryList.value === null ? local : []);
+  return [
+    { key: 'all', label: '全部', icon: '' },
+    ...cats,
+    { key: 'manage', label: '管理分类', icon: 'sliders' },
+  ];
+});
 
 /** 分类过滤 + 排序后的在用列表 */
 const viewList = computed<ItemView[]>(() => {
@@ -515,6 +534,17 @@ function checkNetwork(): Promise<boolean> {
   });
 }
 
+/** 加载分类 chips 数据；失败静默（chips 回退本地默认分类），失败不弹全局 toast */
+async function loadCategories() {
+  try {
+    const res = await ItemApi.category.list(undefined, { custom: { toast: false } as any });
+    categoryList.value = res.rows;
+  }
+  catch {
+    // 保持当前分类展示
+  }
+}
+
 /** 首次进入：骨架 → 校验网络 → ready / error */
 async function initialLoad() {
   loadState.value = 'skeleton';
@@ -522,11 +552,17 @@ async function initialLoad() {
   setTimeout(() => {
     loadState.value = online ? 'ready' : 'error';
   }, 600);
+  if (online) {
+    loadCategories();
+  }
 }
 
 async function retry() {
   const online = await checkNetwork();
   loadState.value = online ? 'ready' : 'error';
+  if (online) {
+    loadCategories();
+  }
 }
 
 /** 错误态「查看本地数据」：本地数据本就可用，直接进入默认态 */
@@ -537,6 +573,9 @@ function useLocal() {
 onShow(() => {
   if (loadState.value === 'skeleton') {
     initialLoad();
+  }
+  else if (loadState.value === 'ready') {
+    loadCategories();
   }
 });
 

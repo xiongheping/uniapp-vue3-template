@@ -11,7 +11,6 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    AgreePrivacy: typeof import('./../src/components/agree-privacy/index.vue')['default']
     LangSelect: typeof import('./../src/components/lang-select/index.vue')['default']
     ThemePicker: typeof import('./../src/components/theme-picker/index.vue')['default']
     XBanner: typeof import('./../src/components/x-banner/index.vue')['default']
