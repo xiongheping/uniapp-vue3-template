@@ -76,6 +76,7 @@
           v-for="opt in themeOptions"
           :key="opt.value"
           :text="opt.label"
+          :icon="opt.icon"
           :active="theme === opt.value"
           @click="setTheme(opt.value)"
         />
@@ -134,6 +135,7 @@ import { useItemStore, useMedicineStore, useMessageStore, useSettingStore } from
 interface ThemeOption {
   value: ThemeMode;
   label: string;
+  icon: string;
 }
 
 const settingStore = useSettingStore();
@@ -145,9 +147,9 @@ const { theme, isDark, setTheme } = useTheme();
 const backupText = computed<string>(() => (uni.getStorageSync('backup_at') as string) || '2026.10.28 21:14');
 
 const themeOptions: ThemeOption[] = [
-  { value: 'auto', label: '跟随系统' },
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
+  { value: 'auto', label: '跟随系统', icon: 'monitor' },
+  { value: 'light', label: '浅色', icon: 'sun' },
+  { value: 'dark', label: '深色', icon: 'moon' },
 ];
 const themeHint = computed<string>(() => {
   if (theme.value === 'auto') {

@@ -30,7 +30,7 @@ import { useMessageStore, useSettingStore } from '@/store';
 
 /**
  * 自定义底部导航（原生 tabBar 已移除）
- * 4 tab：首页 / 用药 / 消息 / 我的；角标口径见 tab-bar.ts
+ * 4 tab：首页 / 计划 / 消息 / 我的；角标口径见 tab-bar.ts
  * elder 模式放大（原型 .elder .tab 13px / .tab-ico 28px）
  */
 interface Props {
@@ -42,10 +42,13 @@ const props = defineProps<Props>();
 const messageStore = useMessageStore();
 const settingStore = useSettingStore();
 
-/** tab 图标：常规 44rpx，elder 56rpx（原型 22px / 28px） */
-const tabIconSize = computed<number>(() => (settingStore.isElder ? 56 : 44));
+/** tab 图标：常规 48rpx（原型 .li lg），elder 56rpx（原型 28px） */
+const tabIconSize = computed<number>(() => (settingStore.isElder ? 56 : 48));
 
 function badgeCount(type: BadgeType): number {
+  if (type === 'none') {
+    return 0;
+  }
   return type === 'p0' ? messageStore.unreadP0 : messageStore.unreadTotal;
 }
 

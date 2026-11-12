@@ -41,7 +41,7 @@
         </view>
       </x-card>
 
-      <x-button type="gray" text="取消识别（将释放次数）" @click="onCancel" />
+      <x-button type="gray" text="取消识别（不扣次数）" @click="onCancel" />
 
       <view style="margin-top: 20rpx">
         <x-note type="blue">
@@ -92,32 +92,48 @@
             </text>
           </view>
         </view>
-        <view class="rec-field">
-          <text class="rec-field__k">
-            到期日
-          </text>
-          <view class="rec-field__v">
-            <text class="rec-lo">
-              未识别
+        <picker mode="date" :value="duePickerValue" @change="onDueChange">
+          <view class="rec-field x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0">
+            <text class="rec-field__k">
+              到期日
             </text>
-            <text class="rec-conf lo">
-              需填写
-            </text>
+            <view class="rec-field__v">
+              <template v-if="result.dueDate">
+                <text class="rec-blue">
+                  {{ result.dueDate }} · 日历选择 ›
+                </text>
+              </template>
+              <template v-else>
+                <text class="rec-lo">
+                  未识别
+                </text>
+                <text class="rec-conf lo">
+                  需填写
+                </text>
+              </template>
+            </view>
           </view>
-        </view>
+        </picker>
         <view class="rec-field">
           <text class="rec-field__k">
             数量
           </text>
-          <x-quantity :model-value="qty" text="1 盒 5 片" @decrease="qty = Math.max(1, qty - 1)" @increase="qty += 1" />
+          <x-quantity
+            :model-value="qty"
+            editable
+            :unit="qtyUnit"
+            @update:model-value="(v: number) => (qty = Math.max(1, v || 1))"
+            @decrease="qty = Math.max(1, qty - 1)"
+            @increase="qty += 1"
+          />
         </view>
       </x-card>
       <x-note type="blue">
         💡 点任一字段可手动修正；也可查看原图核对。
       </x-note>
-      <view class="x-btns row">
-        <x-button type="ghost" small icon="eye" text="查看原图" @click="previewPhoto" />
-        <x-button type="ghost" small icon="camera" text="重拍" @click="reshoot" />
+      <view class="x-btns row rec-row rec-inline">
+        <x-button class="rec-cell" type="ghost" icon="eye" text="查看原图" @click="previewPhoto" />
+        <x-button class="rec-cell" type="ghost" icon="camera" text="重拍" @click="reshoot" />
       </view>
     </view>
 
@@ -153,21 +169,30 @@
             </text>
           </view>
         </view>
-        <view class="rec-field x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0" @tap="pickDue">
-          <text class="rec-field__k">
-            到期日
-          </text>
-          <view class="rec-field__v">
-            <text class="rec-blue">
-              {{ result.dueDate || '未识别' }} · 日历选择 ›
+        <picker mode="date" :value="duePickerValue" @change="onDueChange">
+          <view class="rec-field x-tap-bg" hover-class="x-tap--hover" :hover-start-time="0">
+            <text class="rec-field__k">
+              到期日
             </text>
+            <view class="rec-field__v">
+              <text class="rec-blue">
+                {{ result.dueDate || '未识别' }} · 日历选择 ›
+              </text>
+            </view>
           </view>
-        </view>
+        </picker>
         <view class="rec-field">
           <text class="rec-field__k">
             数量
           </text>
-          <x-quantity :model-value="qty" text="1 盒 5 片" @decrease="qty = Math.max(1, qty - 1)" @increase="qty += 1" />
+          <x-quantity
+            :model-value="qty"
+            editable
+            :unit="qtyUnit"
+            @update:model-value="(v: number) => (qty = Math.max(1, v || 1))"
+            @decrease="qty = Math.max(1, qty - 1)"
+            @increase="qty += 1"
+          />
         </view>
       </x-card>
       <x-card>
@@ -204,8 +229,8 @@
           本次识别已自动释放，不消耗次数。
         </text>
         <view class="x-btns" style="margin-top: 40rpx">
-          <x-button type="primary" icon="camera" text="重拍一张" @click="reshoot" />
-          <x-button type="ghost" icon="keyboard" text="手动输入（不消耗次数）" @click="toManual" />
+          <x-button type="primary" icon="camera" text="重拍" @click="reshoot" />
+          <x-button type="ghost" icon="keyboard" text="手动输入" @click="toManual" />
         </view>
       </view>
     </view>
@@ -255,8 +280,8 @@
         </view>
       </x-card>
       <view class="x-btns">
-        <x-button type="primary" icon="crown" text="升级会员 · AI 识别无限次" @click="goMember" />
-        <x-button type="ghost" icon="keyboard" text="手动输入（不消耗次数）" @click="toManual" />
+        <x-button type="primary" text="升级会员 · AI 识别无限次" @click="goMember" />
+        <x-button type="ghost" icon="keyboard" text="手动输入" @click="toManual" />
       </view>
       <text class="x-sub" style="margin-top: 24rpx; font-size: 22rpx">
         升级后立即生效，到期前 3 天提醒
@@ -265,13 +290,13 @@
 
     <!-- 吸底操作（必须在 x-page 直接子级，否则不会吸底） -->
     <template #sticky>
-      <view v-if="stage === 'lowconf'" class="x-btns row x-safe-bottom">
-        <x-button type="ghost" icon="keyboard" text="手动输入" @click="toManual" />
-        <x-button type="primary" text="确认保存（用预占次数）" @click="toConfirm" />
+      <view v-if="stage === 'lowconf'" class="x-btns row x-safe-bottom rec-row rec-sticky">
+        <x-button class="rec-cell" type="ghost" icon="keyboard" text="手动输入" @click="toManual" />
+        <x-button class="rec-cell" type="primary" text="确认保存" @click="toConfirm" />
       </view>
-      <view v-else-if="stage === 'ok'" class="x-btns row x-safe-bottom">
-        <x-button type="ghost" text="重拍" @click="reshoot" />
-        <x-button type="primary" text="确认保存（用预占次数）" @click="toConfirm" />
+      <view v-else-if="stage === 'ok'" class="x-btns row x-safe-bottom rec-row rec-sticky">
+        <x-button class="rec-cell" type="ghost" text="重拍" @click="reshoot" />
+        <x-button class="rec-cell" type="primary" text="确认保存" @click="toConfirm" />
       </view>
     </template>
 
@@ -289,6 +314,7 @@
 <script setup lang="ts">
 import { useTheme } from '@/hooks';
 import { useSettingStore } from '@/store';
+import { today } from '@/utils/date';
 
 // recognizing | ok | lowconf | failed | quota
 type Stage = 'recognizing' | 'ok' | 'lowconf' | 'failed' | 'quota';
@@ -324,9 +350,16 @@ const qty = ref<number>(1);
 const visibility = ref<'self' | 'family'>('self');
 const needRemind = ref<boolean>(true);
 
-/** 到期日：复用系统日期选择（原型「日历选择 ›」） */
-function pickDue() {
-  uni.showToast({ title: '选择到期日', icon: 'none' });
+/** 到期日：识别结果用点分隔，picker 需要横杠；未识别时从今天开始选 */
+const duePickerValue = computed<string>(() =>
+  result.value.dueDate ? result.value.dueDate.replace(/\./g, '-') : today(),
+);
+
+/** 数量单位：从识别规格里去掉开头数量（「1 盒 5 片」→「盒 5 片」） */
+const qtyUnit = computed<string>(() => result.value.spec.replace(/^\d+\s*/, ''));
+
+function onDueChange(e: { detail: { value: string } }) {
+  result.value.dueDate = e.detail.value.replace(/-/g, '.');
 }
 
 const NAV_TITLE: Record<Stage, string> = {
@@ -435,7 +468,7 @@ function toManual() {
 function toConfirm() {
   // 预占保留，确认保存（在 confirm 页）才消耗
   keepOccupy = true;
-  const q = encodeURIComponent(JSON.stringify(result.value));
+  const q = encodeURIComponent(JSON.stringify({ ...result.value, qty: qty.value }));
   uni.redirectTo({ url: `/pages/item/confirm/index?mode=recognize&data=${q}` });
 }
 
@@ -492,10 +525,37 @@ onUnmounted(() => {
 .rec-center {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   padding-top: 40rpx;
   text-align: center;
+}
+
+/* 双按钮横向平铺：小程序端 class 落在组件宿主节点，全局 `.x-btns.row > .x-button`
+   选不中，需显式给宿主 flex:1 */
+.rec-row {
+  :deep(.x-button) {
+    margin-top: 0;
+  }
+}
+
+.rec-cell {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 原型 09b 行内按钮：字号 13px，高度沿用 .btn 的 48px（不是 small 的 72rpx） */
+.rec-inline {
+  :deep(.x-button) {
+    font-size: 25rpx;
+  }
+}
+
+/* 原型 09b/09c 吸底按钮：字号 14px */
+.rec-sticky {
+  :deep(.x-button) {
+    font-size: 27rpx;
+  }
 }
 
 /* 09 取景器：原型 1:1 方形 + 20px 圆角 */
@@ -651,7 +711,7 @@ onUnmounted(() => {
 .rec-state {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   padding: 40rpx 20rpx;
   text-align: center;
 }

@@ -2,10 +2,18 @@ import type {
   DoseEntry,
   DoseRecord,
   DoseStatus,
+  DoseTime,
   MedPlan,
   MissedEntry,
 } from './types';
+import type {
+  MedicationInstructionVo,
+  MedicationPlanVo,
+  MedicationScheduleVo,
+} from '@/api/xiaoqi/medication';
 import { defineStore } from 'pinia';
+import { MedicationApi } from '@/api/xiaoqi/medication';
+import { isLogin } from '@/utils/auth';
 import storage from '@/utils/storage';
 
 /** 撤销窗口：5 分钟（从打卡成功起算） */
@@ -120,6 +128,139 @@ function nowClock(): number {
   return date.getHours() * 60 + date.getMinutes();
 }
 
+/** 疗程进度：起始日期到今天的天数，缺省为 1 */
+function courseIndexOf(start?: string): number {
+  if (!start) {
+    return 1;
+  }
+  const begin = new Date(`${String(start).slice(0, 10).replace(/-/g, '/')} 00:00:00`).getTime();
+  const todayTime = new Date(`${dayKey().replace(/-/g, '/')} 00:00:00`).getTime();
+  if (Number.isNaN(begin)) {
+    return 1;
+  }
+  return Math.max(1, Math.round((todayTime - begin) / 86400000) + 1);
+}
+
+/** 从「1 粒」「4 片」中取数值 */
+function amountOf(text?: string): number | undefined {
+  const match = String(text ?? '').match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : undefined;
+}
+
+/** 从「4 小时」中取整数 */
+function intOf(text?: string): number | undefined {
+  const match = String(text ?? '').match(/\d+/);
+  return match ? Number(match[0]) : undefined;
+}
+
+/** 时段文案：与计划页 labelOf 口径一致 */
+function labelOfTime(time: string): string | undefined {
+  if (!time) {
+    return undefined;
+  }
+  const hour = Number(String(time).split(':')[0]);
+  if (Number.isNaN(hour)) {
+    return undefined;
+  }
+  if (hour < 6) {
+    return '清晨';
+  }
+  if (hour < 11) {
+    return '早间';
+  }
+  if (hour < 14) {
+    return '午间';
+  }
+  if (hour < 18) {
+    return '午后';
+  }
+  return '晚间';
+}
+
+/** 餐关系 + 偏移分钟 + 时间 → 页面文案（如「早餐后 30 分钟」） */
+function mealTextOf(schedule: MedicationScheduleVo, time: string): string | undefined {
+  const relation = Number(schedule.mealRelation ?? 3);
+  if (relation === 3) {
+    return undefined;
+  }
+  const offset = Number(schedule.mealOffsetMinutes ?? 0);
+  let prefix = '随餐';
+  if (relation !== 2) {
+    const hour = Number(String(time).split(':')[0]);
+    const suffix = relation === 0 ? '前' : '后';
+    if (!Number.isNaN(hour) && hour < 10) {
+      prefix = `早餐${suffix}`;
+    }
+    else if (!Number.isNaN(hour) && hour < 15) {
+      prefix = `午餐${suffix}`;
+    }
+    else if (!Number.isNaN(hour) && hour < 21) {
+      prefix = `晚餐${suffix}`;
+    }
+    else {
+      prefix = `饭${suffix}`;
+    }
+  }
+  return offset > 0 ? `${prefix} ${offset} 分钟` : prefix;
+}
+
+/**
+ * 后端计划 → 前端 MedPlan。
+ * 规格与说明书正文来自 xq_medication_instruction（按 planId 关联）。
+ */
+function toMedPlan(
+  vo: MedicationPlanVo,
+  schedules: MedicationScheduleVo[],
+  instruction: MedicationInstructionVo | null,
+): MedPlan {
+  const unit = vo.stockUnit || vo.dosageUnit || '';
+  const dosageText = vo.dosage != null ? `${vo.dosage}${vo.dosageUnit || ''}` : undefined;
+  const doses: DoseTime[] = schedules.map((schedule) => {
+    const time = String(schedule.scheduleTime || '').slice(0, 5);
+    return {
+      id: String(schedule.id),
+      time,
+      label: labelOfTime(time),
+      afterMeal: mealTextOf(schedule, time),
+      amount: schedule.dosePerTime != null ? `${schedule.dosePerTime}${vo.dosageUnit || ''}` : dosageText,
+      advance: schedule.advanceMinutes ?? undefined,
+      enabled: Number(schedule.status) !== 1,
+    };
+  });
+  const stockQuantity = Number(vo.stockQuantity ?? 0);
+  return {
+    id: String(vo.id),
+    name: vo.drugName,
+    spec: instruction?.specification,
+    approval: instruction?.approvalNumber,
+    type: vo.drugType === 1 ? 'prn' : 'ontime',
+    reason: vo.eventCustomName,
+    doses,
+    course: {
+      total: Number(vo.courseDays ?? 0),
+      index: courseIndexOf(vo.courseStartDate),
+      start: vo.courseStartDate,
+      end: vo.courseEndDate,
+      autoStop: true,
+    },
+    stock: { have: stockQuantity, total: stockQuantity, unit },
+    lowStockDays: vo.lowStockDays ?? 3,
+    perDayMax: vo.maxDailyDose != null ? String(vo.maxDailyDose) : undefined,
+    minInterval: vo.minIntervalHours != null ? String(vo.minIntervalHours) : undefined,
+    prnReason: vo.prnReason,
+    visibility: Number(vo.visibleScope) === 1 ? 'family' : 'self',
+    enabled: Number(vo.status) !== 1,
+    instruction: instruction
+      ? {
+          usage: instruction.usageText,
+          caution: instruction.precautionText,
+          imageUrl: instruction.imageUrl,
+        }
+      : undefined,
+    createdAt: vo.createTime ? String(vo.createTime).slice(0, 10) : undefined,
+  };
+}
+
 function minutesOf(time: string): number {
   const parts = String(time).split(':').map(Number);
   return (parts[0] || 0) * 60 + (parts[1] || 0);
@@ -134,6 +275,11 @@ const useMedicineStore = defineStore('medicine', {
     snoozes: {} as Record<string, number>,
   }),
   getters: {
+    /** 云端模式：已登录即从 /app/xq/medication/today 拉取，未登录降级本地演示 */
+    isCloudMode(): boolean {
+      return isLogin();
+    },
+
     /** 启用中的计划 */
     activePlans(state): MedPlan[] {
       return state.plans.filter(plan => plan.enabled !== false);
@@ -268,6 +414,10 @@ const useMedicineStore = defineStore('medicine', {
      * 只注入一次：SEED_KEY 写入后，即使用户删光计划也不会再次生成
      */
     ensureSeedDemo() {
+      // 云端模式不注入演示数据，避免假数据混进真实用药计划
+      if (this.isCloudMode) {
+        return;
+      }
       if (!DEMO_ENABLED || storage.get(SEED_KEY) === '1') {
         return;
       }
@@ -288,6 +438,92 @@ const useMedicineStore = defineStore('medicine', {
 
     persistRecords() {
       storage.setJSON(RECORD_MAP_KEY, this.records);
+    },
+
+    /**
+     * 拉取完整计划列表（含服药时段、疗程、库存、说明书）。
+     * 计划数为个位数，按计划逐个补时段与说明书，避免依赖 create_by 分页过滤。
+     */
+    async fetchPlans(): Promise<void> {
+      if (!this.isCloudMode) {
+        return;
+      }
+      try {
+        const page = await MedicationApi.plan.list({ pageNum: 1, pageSize: 100 });
+        const rows = page.rows || [];
+        const plans: MedPlan[] = [];
+        for (const row of rows) {
+          const planId = String(row.id);
+          const [schedules, instruction] = await Promise.all([
+            MedicationApi.schedule
+              .list({ planId: row.id, pageNum: 1, pageSize: 50 })
+              .then(res => res.rows || [])
+              .catch(() => []),
+            MedicationApi.instructionByPlan(planId).catch(() => null),
+          ]);
+          plans.push(toMedPlan(row, schedules, instruction));
+        }
+        this.plans = plans;
+        this.persistPlans();
+      }
+      catch (error) {
+        console.warn('medication fetchPlans failed:', error);
+      }
+    },
+
+    /**
+     * 拉取今日用药时间轴（服务端派生状态），覆盖今日记录并补齐缺失的计划。
+     */
+    async fetchToday(): Promise<void> {
+      if (!this.isCloudMode) {
+        return;
+      }
+      try {
+        const today = await MedicationApi.today();
+        const date = dayKey();
+        const todayRecords: Record<string, DoseRecord> = {};
+        for (const entry of today.entries || []) {
+          const planId = String(entry.planId);
+          let plan = this.plans.find(item => item.id === planId);
+          if (!plan) {
+            plan = {
+              id: planId,
+              name: entry.drugName,
+              type: entry.drugType === 1 ? 'prn' : 'ontime',
+              doses: [],
+              visibility: 'self',
+              enabled: true,
+              prnReason: entry.prnReason,
+            };
+            this.plans.push(plan);
+          }
+          const doseId = entry.scheduleId != null ? String(entry.scheduleId) : 'prn';
+          if (!plan.doses.some(dose => dose.id === doseId)) {
+            plan.doses.push({
+              id: doseId,
+              time: entry.planTime || '',
+              amount: entry.dosageText,
+              enabled: true,
+            });
+          }
+          if (entry.status === 'taken' || entry.status === 'skipped' || entry.status === 'missed') {
+            todayRecords[this.recordKey(planId, doseId, date)] = {
+              status: entry.status,
+              takenAt: entry.actualTime ? entry.actualTime.slice(11, 16) : undefined,
+              recordId: entry.recordId != null ? String(entry.recordId) : undefined,
+            };
+          }
+        }
+        const history = Object.fromEntries(
+          Object.entries(this.records).filter(([key]) => !key.endsWith(date)),
+        ) as Record<string, DoseRecord>;
+        this.records = { ...history, ...todayRecords };
+        this.persistPlans();
+        this.persistRecords();
+      }
+      catch (error) {
+        console.warn('medication fetchToday failed:', error);
+      }
     },
 
     planById(id: string): MedPlan | null {
@@ -321,6 +557,15 @@ const useMedicineStore = defineStore('medicine', {
         plan.stock.have -= 1;
         this.persistPlans();
       }
+      if (this.isCloudMode) {
+        MedicationApi.checkin({
+          planId,
+          scheduleId: doseId === 'prn' ? undefined : doseId,
+          date,
+        })
+          .then(() => this.fetchToday())
+          .catch((error: any) => console.warn('medication checkin failed:', error));
+      }
     },
 
     /** 撤销打卡：恢复为待服用，库存退回 */
@@ -329,6 +574,7 @@ const useMedicineStore = defineStore('medicine', {
       if (!record || record.status !== 'taken') {
         return;
       }
+      const recordId = record.recordId;
       this.records[key] = { status: 'pending' };
       this.persistRecords();
       const [planId] = key.split(':');
@@ -337,6 +583,11 @@ const useMedicineStore = defineStore('medicine', {
         plan.stock.have += 1;
         this.persistPlans();
       }
+      if (this.isCloudMode && recordId) {
+        MedicationApi.undo(recordId)
+          .then(() => this.fetchToday())
+          .catch((error: any) => console.warn('medication undo failed:', error));
+      }
     },
 
     /** 跳过今日这一剂（不扣库存） */
@@ -344,6 +595,15 @@ const useMedicineStore = defineStore('medicine', {
       const key = this.recordKey(planId, doseId, date);
       this.records[key] = { status: 'skipped' };
       this.persistRecords();
+      if (this.isCloudMode) {
+        MedicationApi.skip({
+          planId,
+          scheduleId: doseId === 'prn' ? undefined : doseId,
+          date,
+        })
+          .then(() => this.fetchToday())
+          .catch((error: any) => console.warn('medication skip failed:', error));
+      }
     },
 
     /** 标记错过（昨日漏服 / 超时未打卡） */
@@ -380,7 +640,58 @@ const useMedicineStore = defineStore('medicine', {
     /**
      * 保存计划：有 id 更新，无 id 新建；修改时间点只影响之后的提醒
      */
-    savePlan(payload: Partial<MedPlan>) {
+    async savePlan(payload: Partial<MedPlan>): Promise<void> {
+      if (this.isCloudMode) {
+        const doses = payload.doses || [];
+        const enabledDoses = doses.filter(dose => dose.enabled !== false && !!dose.time);
+        // 按需模式没有服药时段，显式传空数组以清掉历史时段
+        const isPrn = payload.type === 'prn';
+        const times = isPrn ? [] : payload.doses ? enabledDoses.map(dose => dose.time) : null;
+        const doseTimes = isPrn
+          ? []
+          : payload.doses
+            ? doses
+                .filter(dose => !!dose.time)
+                .map(dose => ({
+                  time: dose.time,
+                  amount: amountOf(dose.amount),
+                  advanceMinutes: dose.advance,
+                  enabled: dose.enabled !== false,
+                  afterMeal: dose.afterMeal || undefined,
+                }))
+            : null;
+        const firstDose = enabledDoses[0] ?? doses[0];
+        const body: Record<string, unknown> = {
+          id: payload.id && /^\d+$/.test(payload.id) ? payload.id : undefined,
+          drugName: payload.name,
+          dosage: amountOf(firstDose?.amount),
+          dosageUnit: payload.stock?.unit || undefined,
+          drugType: payload.type === 'prn' ? 1 : 0,
+          prnReason: payload.prnReason,
+          maxDailyDose: amountOf(payload.perDayMax),
+          minIntervalHours: intOf(payload.minInterval),
+          courseDays: payload.course?.total,
+          courseStartDate: payload.course?.start || undefined,
+          courseEndDate: payload.course?.end || undefined,
+          stockQuantity: payload.stock?.have,
+          stockUnit: payload.stock?.unit,
+          lowStockDays: payload.lowStockDays,
+          visibleScope: payload.visibility === 'family' ? 1 : 0,
+          status: payload.enabled === false ? 1 : 0,
+          eventCustomName: payload.reason,
+          times,
+          doseTimes,
+          // 规格/批准文号/说明书正文落到 xq_medication_instruction
+          specification: payload.spec || undefined,
+          approvalNumber: payload.approval || undefined,
+          usageText: payload.instruction?.usage || undefined,
+          precautionText: payload.instruction?.caution || undefined,
+          imageUrl: payload.instruction?.imageUrl || undefined,
+        };
+        await MedicationApi.savePlanFull(body);
+        await Promise.all([this.fetchPlans(), this.fetchToday()]);
+        return;
+      }
       if (payload.id) {
         const target = this.plans.find(plan => plan.id === payload.id);
         if (target) {
@@ -404,9 +715,13 @@ const useMedicineStore = defineStore('medicine', {
     /**
      * 删除计划：今日之后的排班一并移除，历史打卡记录保留
      */
-    removePlan(id: string) {
+    async removePlan(id: string): Promise<void> {
       this.plans = this.plans.filter(plan => plan.id !== id);
       this.persistPlans();
+      if (this.isCloudMode && /^\d+$/.test(id)) {
+        await MedicationApi.plan.remove(id);
+        await Promise.all([this.fetchPlans(), this.fetchToday()]);
+      }
     },
   },
   persist: true,

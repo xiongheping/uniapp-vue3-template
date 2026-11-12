@@ -43,7 +43,7 @@
           网络开小差了
         </text>
         <text class="home-state__sub">
-          无法连接服务器。你的数据都安全存在本机，不会丢失。
+          无法连接服务器，请检查网络后重试。已同步的数据仍可查看。
         </text>
         <view class="x-btns row home-state__btns">
           <x-button type="ghost" text="查看本地数据" @click="useLocal" />
@@ -96,9 +96,10 @@
             <text class="home-tile__num">
               {{ t.n }}
             </text>
-            <text class="home-tile__label">
-              {{ t.label }}
-            </text>
+            <view class="home-tile__label">
+              <x-icon :name="t.icon" :size="24" color="#ffffff" />
+              <text>{{ t.label }}</text>
+            </view>
           </view>
         </view>
         <view v-if="todoStrong" class="home-todo x-tap-on-color" hover-class="x-tap-on-color--hover" :hover-start-time="0" @tap="gotoMedicine">
@@ -151,7 +152,10 @@
       <template v-for="g in groups" :key="g.key">
         <template v-if="g.items.length">
           <view class="home-grp-bar">
-            <text>{{ g.title }} · {{ g.items.length }}</text>
+            <view class="home-grp-bar__name">
+              <x-icon :name="g.icon" :size="28" :color="g.color" />
+              <text>{{ g.title }} · {{ g.items.length }}</text>
+            </view>
             <text
               v-if="g.key === 'safe'"
               class="home-grp-bar__more x-tap-opacity"
@@ -218,7 +222,7 @@
       </view>
 
       <x-note type="blue">
-        👆 左滑「还在用」询问：顺延 30 天 / 保持 / 取消，操作后可撤销。点 tile 可预筛选分组；Tab 角标 3 为总未读。长按任意物品可进入批量管理。
+        👆 左滑「还在用」可顺延 30 天 / 保持不变，操作后可撤销。点 tile 可预筛选分组；消息 Tab 角标为未读提醒数。长按任意物品可进入批量管理。
       </x-note>
 
       <!-- FAB -->
@@ -254,17 +258,47 @@
           <x-button type="ghost" text="取消" block @click="showKeep = false" />
         </view>
       </x-sheet>
+
+      <!-- 管理分类：真实分类 CRUD（系统预置不可删除） -->
+      <x-sheet v-model:show="showCat" title="管理分类">
+        <view class="home-cat">
+          <view v-for="c in myCategories" :key="c.id" class="home-cat__row">
+            <x-icon :name="c.icon || 'package'" :size="32" />
+            <text class="home-cat__name">
+              {{ c.categoryName }}
+            </text>
+            <text class="home-cat__del" @tap="removeCategory(c)">
+              删除
+            </text>
+          </view>
+          <text v-if="!myCategories.length" class="home-cat__empty">
+            系统预置分类不可删除，可新增自定义分类
+          </text>
+          <view class="home-cat__add">
+            <input
+              v-model="newCatName"
+              class="home-cat__input"
+              placeholder="新分类名称，如「保健品」"
+              :maxlength="12"
+              confirm-type="done"
+              @confirm="addCategory"
+            >
+            <x-button text="添加" small :disabled="catSaving" @click="addCategory" />
+          </view>
+        </view>
+      </x-sheet>
     </template>
   </x-page>
 </template>
 
 <script setup lang="ts">
+import type { HomeDigestVo } from '@/api/xiaoqi/home';
 import type { ItemCategoryVo } from '@/api/xiaoqi/item';
 import type { ItemCategory, ItemView } from '@/store/modules/item/types';
 import { onShow } from '@dcloudio/uni-app';
 import { computed, ref } from 'vue';
-import { ItemApi } from '@/api';
-import { useItemStore, useMedicineStore, useUserStore } from '@/store';
+import { HomeApi, ItemApi } from '@/api';
+import { useItemStore, useMedicineStore, useMessageStore, useUserStore } from '@/store';
 import { CATEGORIES } from '@/store/modules/item';
 import { cnDate } from '@/utils/date';
 
@@ -273,10 +307,14 @@ type LoadState = 'skeleton' | 'ready' | 'error';
 
 const itemStore = useItemStore();
 const medicineStore = useMedicineStore();
+const messageStore = useMessageStore();
 const userStore = useUserStore();
 
 const userName = computed<string>(() => userStore.nickname || '朋友');
 const loadState = ref<LoadState>('skeleton');
+
+/** 今日摘要（GET /app/xq/home/digest）：tile 数字、今日服药进度、未读数均以此为准 */
+const digest = ref<HomeDigestVo | null>(null);
 
 /**
  * 展示模式开关：决定首页渲染「添加按钮（空态）」还是「物品列表（07 默认态）」
@@ -319,39 +357,123 @@ const safeOpen = computed<boolean>(() =>
   expandSafe.value || chip.value === 'safe' || !!itemStore.keyword.trim(),
 );
 
-const tiles = computed(() => [
-  { key: 'expired', label: '🔴 过期', n: itemStore.stats.expired },
-  { key: 'expiring', label: '⚠️ 临期', n: itemStore.stats.expiring },
-  { key: 'safe', label: '✓ 安全', n: itemStore.stats.active - itemStore.stats.expired - itemStore.stats.expiring },
-]);
+/**
+ * 概览 tile 数字：优先用首页摘要（服务端聚合口径），
+ * 摘要未返回时按同一分组口径本地统计，保证与列表条数一致。
+ */
+const tiles = computed(() => {
+  const d = digest.value;
+  const list = itemStore.filtered;
+  const countOf = (key: 'expired' | 'expiring' | 'safe') => list.filter(it => groupKeyOf(it) === key).length;
+  return [
+    { key: 'expired', label: '过期', icon: 'circle-alert', n: d?.expiredCount ?? countOf('expired') },
+    { key: 'expiring', label: '临期', icon: 'triangle-alert', n: d?.expiringCount ?? countOf('expiring') },
+    { key: 'safe', label: '安全', icon: 'circle-check', n: d?.safeCount ?? countOf('safe') },
+  ];
+});
 
 /** tile 高亮：仅表示「当前正按该分组筛选」 */
 function isTileOn(key: string): boolean {
   return chip.value === key;
 }
 
+/** 今日剂次口径：摘要优先，未返回时用本地时间轴 */
+const doseTotal = computed<number>(() => digest.value?.todayDoseTotal ?? medicineStore.todayTotal);
+const doseDone = computed<number>(() => digest.value?.todayDoseDone ?? medicineStore.todayDone);
+const dosePending = computed<number>(() => Math.max(0, doseTotal.value - doseDone.value));
+
 /** 今日待办：拆成「今日待办：」+ 加粗结论，对齐原型 07 todo 行 */
 const todoLabel = computed<string>(() => {
-  if (medicineStore.isAllDone) {
+  if (doseTotal.value > 0 && dosePending.value === 0) {
     return '今日用药已完成 ';
   }
-  if (medicineStore.pendingEntries.length > 0) {
+  if (dosePending.value > 0) {
     return '今日待办：';
   }
   return '';
 });
 const todoStrong = computed<string>(() => {
-  if (medicineStore.isAllDone) {
-    return `${medicineStore.todayDone}/${medicineStore.todayTotal} ✓`;
+  if (doseTotal.value > 0 && dosePending.value === 0) {
+    return `${doseDone.value}/${doseTotal.value} ✓`;
   }
-  if (medicineStore.pendingEntries.length > 0) {
-    return `${medicineStore.pendingEntries.length} 次服药未打卡`;
+  if (dosePending.value > 0) {
+    return `${dosePending.value} 次服药未打卡`;
   }
   return '';
 });
 
-/** 接口分类列表（/xiaoqi/item/category/list）；null 表示未加载或加载失败，回退本地默认分类 */
+/** 接口分类列表（/app/xq/item/category/list）；null 表示未加载或加载失败，回退本地默认分类 */
 const categoryList = ref<ItemCategoryVo[] | null>(null);
+
+/** 管理分类弹层（真实 CRUD：POST/PUT/DELETE /app/xq/item/category） */
+const showCat = ref(false);
+const newCatName = ref('');
+const catSaving = ref(false);
+
+/** 用户自建分类（is_system=1 的系统预置分类不可删除） */
+const myCategories = computed<ItemCategoryVo[]>(() =>
+  (categoryList.value || []).filter(c => c.isSystem !== 1),
+);
+
+/** 分类名称 → chips key（与 chips 计算保持一致，用于删除后重置筛选） */
+function categoryChipKey(c: ItemCategoryVo): string {
+  return CATEGORIES.find(local => local.label === c.categoryName)?.key || `api-${c.id}`;
+}
+
+/** 新增自定义分类 */
+async function addCategory() {
+  const name = newCatName.value.trim();
+  if (!name) {
+    uni.$u?.toast?.('请输入分类名称');
+    return;
+  }
+  if ((categoryList.value || []).some(c => c.categoryName === name)) {
+    uni.$u?.toast?.('该分类已存在');
+    return;
+  }
+  catSaving.value = true;
+  try {
+    const sort = Math.max(0, ...(categoryList.value || []).map(c => c.sort || 0)) + 1;
+    await ItemApi.category.add({ categoryName: name, icon: 'package', sort, isSystem: 0, status: 0 });
+    newCatName.value = '';
+    await loadCategories();
+    uni.$u?.toast?.('已添加');
+  }
+  catch {
+    // 拦截器已提示后端原因
+  }
+  finally {
+    catSaving.value = false;
+  }
+}
+
+/** 删除自定义分类（二次确认；分类下物品由后端置为未分类） */
+function removeCategory(c: ItemCategoryVo) {
+  if (c.isSystem === 1 || c.id === undefined || c.id === null) {
+    return;
+  }
+  const categoryId = c.id;
+  uni.showModal({
+    title: '删除分类',
+    content: `确定删除「${c.categoryName}」？该分类下的物品会变为「其他」。`,
+    success: async (res) => {
+      if (!res.confirm) {
+        return;
+      }
+      try {
+        await ItemApi.category.remove(categoryId);
+        if (chip.value === categoryChipKey(c)) {
+          chip.value = 'all';
+        }
+        await loadCategories();
+        uni.$u?.toast?.('已删除');
+      }
+      catch {
+        // 拦截器已提示
+      }
+    },
+  });
+}
 
 /** 分类 chips：全部 + 接口分类 + 管理分类 */
 const chips = computed(() => {
@@ -374,22 +496,34 @@ const chips = computed(() => {
   ];
 });
 
+/** 默认临期窗口（天）：与后端 HomeBizService.DEFAULT_REMINDER_DAYS 一致 */
+const DEFAULT_REMINDER_DAYS = 7;
+
+/** 单件物品的临期窗口：取该物品配置的提前提醒天数，未配置时用默认值 */
+function expireWindow(it: ItemView): number {
+  const days = it.remindDays?.[0];
+  return typeof days === 'number' && days > 0 ? days : DEFAULT_REMINDER_DAYS;
+}
+
+/** 分组口径与后端一致：过期（<今天）/ 临期（0~提醒天数）/ 安全 */
+function groupKeyOf(it: ItemView): 'expired' | 'expiring' | 'safe' {
+  if (it.dueDays < 0) {
+    return 'expired';
+  }
+  return it.dueDays <= expireWindow(it) ? 'expiring' : 'safe';
+}
+
 /** 分类过滤 + 排序后的在用列表 */
 const viewList = computed<ItemView[]>(() => {
   let list = itemStore.filtered;
   if (chip.value === 'expired' || chip.value === 'expiring' || chip.value === 'safe') {
-    list = list.filter((it) => {
-      if (chip.value === 'expired') {
-        return it.dueDays < 0;
-      }
-      if (chip.value === 'expiring') {
-        return it.dueDays >= 0 && it.dueDays <= 30;
-      }
-      return it.dueDays > 30;
-    });
+    list = list.filter(it => groupKeyOf(it) === chip.value);
   }
   else if (chip.value !== 'all' && chip.value !== 'manage') {
-    list = list.filter(it => it.category === chip.value);
+    // 后端分类 chip 用 api-{categoryId} 表达，按云端分类ID匹配；本地分类按 key 匹配
+    list = chip.value.startsWith('api-')
+      ? list.filter(it => String(it.cloudCategoryId ?? '') === chip.value.slice(4))
+      : list.filter(it => it.category === chip.value);
   }
   if (sortMode.value === 'added') {
     return [...list].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
@@ -398,9 +532,9 @@ const viewList = computed<ItemView[]>(() => {
 });
 
 const groups = computed(() => [
-  { key: 'expired', title: '🔴 已过期', items: viewList.value.filter(it => it.dueDays < 0) },
-  { key: 'expiring', title: '⚠️ 临期中', items: viewList.value.filter(it => it.dueDays >= 0 && it.dueDays <= 30) },
-  { key: 'safe', title: '✓ 安全', items: viewList.value.filter(it => it.dueDays > 30) },
+  { key: 'expired', title: '已过期', icon: 'circle-alert', color: 'var(--color-danger-strong)', items: viewList.value.filter(it => groupKeyOf(it) === 'expired') },
+  { key: 'expiring', title: '临期中', icon: 'triangle-alert', color: 'var(--color-warning-strong)', items: viewList.value.filter(it => groupKeyOf(it) === 'expiring') },
+  { key: 'safe', title: '安全', icon: 'circle-check', color: 'var(--color-success)', items: viewList.value.filter(it => groupKeyOf(it) === 'safe') },
 ]);
 
 /** tile 点击预筛选对应分组 */
@@ -415,10 +549,11 @@ function toggleSort() {
 }
 
 function toneOf(it: ItemView): string {
-  if (it.dueDays < 0) {
+  const group = groupKeyOf(it);
+  if (group === 'expired') {
     return 'red';
   }
-  return it.dueDays <= 30 ? 'orange' : 'green';
+  return group === 'expiring' ? 'orange' : 'green';
 }
 
 function iconOf(category: ItemCategory): string {
@@ -521,10 +656,6 @@ function gotoFamily() {
   uni.navigateTo({ url: '/pages/user/family/index' });
 }
 
-function gotoSetting() {
-  uni.navigateTo({ url: '/pages/user/setting/index' });
-}
-
 function checkNetwork(): Promise<boolean> {
   return new Promise((resolve) => {
     uni.getNetworkType({
@@ -537,32 +668,61 @@ function checkNetwork(): Promise<boolean> {
 /** 加载分类 chips 数据；失败静默（chips 回退本地默认分类），失败不弹全局 toast */
 async function loadCategories() {
   try {
-    const res = await ItemApi.category.list(undefined, { custom: { toast: false } as any });
-    categoryList.value = res.rows;
+    const res = await ItemApi.category.list({ pageNum: 1, pageSize: 100 }, { custom: { toast: false } as any });
+    categoryList.value = res.rows || [];
   }
   catch {
     // 保持当前分类展示
   }
 }
 
-/** 首次进入：骨架 → 校验网络 → ready / error */
-async function initialLoad() {
-  loadState.value = 'skeleton';
-  const online = await checkNetwork();
-  setTimeout(() => {
-    loadState.value = online ? 'ready' : 'error';
-  }, 600);
-  if (online) {
-    loadCategories();
+/** 骨架屏最短停留（避免真实接口过快导致闪屏） */
+const SKELETON_MIN_MS = 320;
+
+function wait(ms: number): Promise<void> {
+  return new Promise<void>(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * 首页数据加载（真实接口驱动）：
+ * - /app/xq/home/digest：tile 数字、今日服药进度
+ * - /app/xq/item/list：物品列表（分类缓存随之就绪）
+ * - /app/xq/item/category/list：分类 chips
+ * - /app/xq/notification/list：消息 tab 未读角标
+ * 摘要接口失败但本地有物品时仍进 ready（列表可用），否则进 error 态。
+ */
+async function loadHome(silent = false) {
+  if (!silent) {
+    loadState.value = 'skeleton';
   }
+  const online = await checkNetwork();
+  if (!online) {
+    loadState.value = 'error';
+    return;
+  }
+  const [digestRes] = await Promise.all([
+    HomeApi.digest()
+      .then(d => ({ ok: true as const, data: d }))
+      .catch(() => ({ ok: false as const, data: null })),
+    itemStore.fetchList(),
+    loadCategories(),
+    messageStore.fetchList(),
+    silent ? Promise.resolve() : wait(SKELETON_MIN_MS),
+  ]);
+  if (digestRes.ok) {
+    digest.value = digestRes.data ?? null;
+    loadState.value = 'ready';
+    return;
+  }
+  // 静默刷新失败：保留当前页面内容，不打断用户
+  if (silent) {
+    return;
+  }
+  loadState.value = itemStore.stats.active > 0 ? 'ready' : 'error';
 }
 
 async function retry() {
-  const online = await checkNetwork();
-  loadState.value = online ? 'ready' : 'error';
-  if (online) {
-    loadCategories();
-  }
+  await loadHome();
 }
 
 /** 错误态「查看本地数据」：本地数据本就可用，直接进入默认态 */
@@ -571,18 +731,14 @@ function useLocal() {
 }
 
 onShow(() => {
-  if (loadState.value === 'skeleton') {
-    initialLoad();
-  }
-  else if (loadState.value === 'ready') {
-    loadCategories();
-  }
+  // 首次进入走骨架屏；之后每次回到首页静默刷新，避免骨架闪烁
+  loadHome(loadState.value !== 'skeleton');
 });
 
-/** 管理分类 chip 暂以设置页承载 */
+/** 分类 chip：管理分类打开分类维护弹层，其余切换筛选 */
 function onChipTap(key: HomeFilter) {
   if (key === 'manage') {
-    gotoSetting();
+    showCat.value = true;
     return;
   }
   chip.value = key;
@@ -789,6 +945,9 @@ function onChipTap(key: HomeFilter) {
 }
 
 .home-tile__label {
+  display: flex;
+  gap: 6rpx;
+  align-items: center;
   margin-top: 4rpx;
   font-size: var(--fs-caption);
   color: #ffffff;
@@ -901,6 +1060,12 @@ function onChipTap(key: HomeFilter) {
   color: #3d5af1;
   background: #e9eef8;
   border-radius: 16rpx;
+}
+
+.home-grp-bar__name {
+  display: flex;
+  gap: 8rpx;
+  align-items: center;
 }
 
 .home-grp-bar__more {
@@ -1078,5 +1243,58 @@ function onChipTap(key: HomeFilter) {
   margin-top: 4rpx;
   font-size: var(--fs-sub);
   color: var(--color-text-sub);
+}
+
+/* 管理分类弹层 */
+.home-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.home-cat__row {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  padding: 20rpx 8rpx;
+  color: var(--color-text);
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.home-cat__name {
+  flex: 1;
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.home-cat__del {
+  padding: 6rpx 18rpx;
+  font-size: var(--fs-sub);
+  color: var(--color-danger-strong);
+  background: var(--color-danger-light);
+  border-radius: 20rpx;
+}
+
+.home-cat__empty {
+  padding: 28rpx 8rpx;
+  font-size: var(--fs-sub);
+  color: var(--color-text-sub);
+}
+
+.home-cat__add {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  margin-top: 20rpx;
+}
+
+.home-cat__input {
+  flex: 1;
+  min-height: 84rpx;
+  padding: 0 24rpx;
+  font-size: var(--fs-body);
+  color: var(--color-text);
+  background: var(--color-fill-light);
+  border-radius: var(--radius-cell);
 }
 </style>

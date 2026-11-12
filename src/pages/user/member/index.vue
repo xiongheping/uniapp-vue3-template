@@ -13,8 +13,8 @@
       </x-note>
 
       <!-- 18c 会员到期提醒（已开通时展示） -->
-      <block v-if="settingStore.isMember">
-        <x-banner :text="`⏰ 会员将于 ${expireText} 到期（剩 ${daysLeft} 天），到期后 AI 识别恢复为 10 次/月。`" />
+      <block v-if="isMember">
+        <x-banner :text="`⏰ 会员将于 ${expireText} 到期${Number.isNaN(daysLeft) ? '' : `（剩 ${daysLeft} 天）`}，到期后 AI 识别恢复为 10 次/月。`" />
         <x-card>
           <view class="mb-sec">
             ⭐ {{ planTitle }} 状态
@@ -55,7 +55,7 @@
       </x-card>
 
       <!-- 方案卡 -->
-      <view class="mb-plans">
+      <view v-if="plans.length" class="mb-plans">
         <view
           v-for="plan in plans"
           :key="plan.key"
@@ -86,6 +86,9 @@
           </view>
         </view>
       </view>
+      <x-note v-else>
+        暂无可购买的会员方案，请稍后重试。
+      </x-note>
 
       <!-- 支付方式 -->
       <x-card>
@@ -110,6 +113,9 @@
           <text v-if="payResult === 'success'" class="mb-result__emoji">
             ✅
           </text>
+          <text v-else-if="payResult === 'pending'" class="mb-result__emoji">
+            ⏳
+          </text>
           <x-icon v-else-if="payResult === 'fail'" name="alert" :size="128" color="#FA5151" />
           <x-icon v-else name="x" :size="128" color="#8A93A5" />
         </view>
@@ -123,26 +129,14 @@
           <x-field label="套餐" :value="resultPlanName" />
           <x-field label="实付" :value="resultPaid" :tone="payResult === 'success' ? 'primary' : ''" />
           <x-field label="下次扣费" :value="resultNext" />
-          <x-field label="订单号" value="XQ202610300001" last />
+          <x-field label="订单号" :value="orderNo || '—'" last />
         </x-card>
         <view class="x-btns">
-          <x-button :text="payResult === 'success' ? '开始使用' : '重新开通'" @click="handleContinue" />
+          <x-button :text="payResult === 'success' ? '开始使用' : '重新选择方案'" @click="handleContinue" />
           <x-button type="ghost" text="返回方案" @click="showResult = false" />
         </view>
         <view class="x-sub mb-result__tip">
           扣费失败或取消时，权益保留至到期日
-        </view>
-        <view class="mb-preview">
-          <text>本地模拟支付结果预览：</text>
-          <text class="mb-preview__link" @tap="previewResult('success')">
-            成功
-          </text>
-          <text class="mb-preview__link" @tap="previewResult('fail')">
-            失败
-          </text>
-          <text class="mb-preview__link" @tap="previewResult('close')">
-            关闭
-          </text>
         </view>
       </view>
     </block>
@@ -150,8 +144,8 @@
     <!-- 底部 sticky：仅方案页 -->
     <template v-if="!showResult" #sticky>
       <view class="x-btns row">
-        <block v-if="settingStore.isMember">
-          <x-button text="立即续费 · ¥48/年" @click="handlePay" />
+        <block v-if="isMember">
+          <x-button :text="`立即续费 · ${selectedPlanObj.price}${selectedPlanObj.unit}`" @click="handlePay" />
           <x-button type="ghost" text="关闭自动续费" @click="handleCloseRenew" />
         </block>
         <x-button v-else :disabled="selectedPlanObj.baseline" :text="ctaText" @click="handlePay" />
@@ -164,12 +158,11 @@
 </template>
 
 <script setup lang="ts">
-import type { PlanLevel } from '@/store/modules/setting/types';
+import type { MemberSubscriptionVo, MemberTierVo } from '@/api/xiaoqi/member';
+import { MemberApi } from '@/api/xiaoqi/member';
 import { usePermission } from '@/hooks';
-import { useSettingStore } from '@/store';
-import { addDays, dotDate } from '@/utils/date';
 
-type PayResultState = 'success' | 'fail' | 'close';
+type PayResultState = 'success' | 'fail' | 'close' | 'pending';
 type PayMethod = 'apple' | 'wechat';
 
 interface PlanFeature {
@@ -179,6 +172,8 @@ interface PlanFeature {
 
 interface Plan {
   key: string;
+  /** 方案ID（下单用） */
+  id?: number | string;
   name: string;
   price: string;
   unit: string;
@@ -197,69 +192,78 @@ interface CompareRow {
   proText: string;
 }
 
-// 会员档位（家庭组 / 会员年费）文案：B 的 PlanLevel 只有 free/member，档位区分在此页面内持久化
-const PLAN_TIER_KEY = 'member_plan_tier';
-type PlanTier = 'pro' | 'family';
-
-const settingStore = useSettingStore();
-
 const showResult = ref(false);
-const payResult = ref<PayResultState>('success');
+const payResult = ref<PayResultState>('pending');
 const payMethod = ref<PayMethod>('apple');
-const selected = ref<string>('pro');
-const planTier = ref<PlanTier>((uni.getStorageSync(PLAN_TIER_KEY) as PlanTier) || 'pro');
+const selected = ref<string>('');
+const orderNo = ref<string>('');
 
-const plans: Plan[] = [
-  {
-    key: 'free',
-    name: '免费版',
-    price: '¥0',
-    unit: '',
-    note: '当前基线 · 不可选',
-    baseline: true,
-    hot: false,
-    feats: [
-      { on: true, text: '全部基础功能' },
-      { on: true, text: 'AI 识别 10 次/月' },
-      { on: true, text: '本地存储' },
-      { on: false, text: '云同步' },
-      { on: false, text: '消耗报表' },
-    ],
-  },
-  {
-    key: 'pro',
-    name: '会员',
-    price: '¥48',
-    unit: '/年',
-    note: '≈ ¥4/月',
-    badge: '推荐',
-    baseline: false,
-    hot: true,
-    feats: [
-      { on: true, text: 'AI 识别无限次' },
-      { on: true, text: '云同步 + 多端' },
-      { on: true, text: '消耗/浪费报表' },
-      { on: true, text: '历史永久保留' },
-      { on: true, text: '专属主题' },
-    ],
-  },
-  {
-    key: 'family',
-    name: '家庭组',
-    price: '¥68',
-    unit: '/年',
-    note: '6 人均摊 ¥11',
-    baseline: false,
-    hot: false,
-    feats: [
-      { on: true, text: '含会员全部权益' },
-      { on: true, text: '6 人共享' },
-      { on: true, text: '一人付费全家用' },
-      { on: true, text: '跨成员提醒转发' },
-      { on: false, text: '不含专属主题' },
-    ],
-  },
-];
+const tiers = ref<MemberTierVo[]>([]);
+const subscription = ref<MemberSubscriptionVo | null>(null);
+
+/** 金额：去掉无意义的小数零 */
+function formatMoney(value?: number): string {
+  const num = Number(value ?? 0);
+  return Number.isInteger(num) ? String(num) : num.toFixed(2);
+}
+
+/** 权益 JSON → 可读条目；后端存的是对象（如 {"ai_quota":-1,"cloud_sync":1}） */
+function parseFeats(json?: string): PlanFeature[] {
+  if (!json) {
+    return [];
+  }
+  let data: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed)) {
+      return parsed.map(item => ({ on: true, text: String(item) }));
+    }
+    data = parsed as Record<string, unknown>;
+  }
+  catch {
+    return [];
+  }
+  const feats: PlanFeature[] = [];
+  const num = (key: string): number | undefined => (data[key] == null ? undefined : Number(data[key]));
+  const quota = num('ai_quota');
+  if (quota != null) {
+    feats.push({ on: true, text: quota < 0 ? 'AI 识别无限次' : `AI 识别 ${quota} 次` });
+  }
+  const cloud = num('cloud_sync');
+  if (cloud != null) {
+    feats.push({ on: cloud === 1, text: cloud === 1 ? '云同步 + 多端' : '不含云同步' });
+  }
+  const report = num('report');
+  if (report != null) {
+    feats.push({ on: report === 1, text: report === 1 ? '消耗/浪费报表' : '不含消耗报表' });
+  }
+  const history = num('history');
+  if (history != null && history === 1) {
+    feats.push({ on: true, text: '历史永久保留' });
+  }
+  const theme = num('theme');
+  if (theme != null && theme === 1) {
+    feats.push({ on: true, text: '专属主题' });
+  }
+  const family = num('family');
+  if (family != null && family > 0) {
+    feats.push({ on: true, text: `${family} 人共享` });
+  }
+  return feats;
+}
+
+const plans = computed<Plan[]>(() => tiers.value.map(tier => ({
+  key: tier.planCode,
+  id: tier.id,
+  name: tier.planName,
+  price: `¥${formatMoney(tier.price)}`,
+  unit: tier.durationDays ? `/${tier.durationDays}天` : '',
+  note: tier.memberCount && tier.memberCount > 1 ? `${tier.memberCount} 人共享` : '个人使用',
+  baseline: tier.planType === 0,
+  hot: tier.planType === 1,
+  badge: tier.planType === 1 ? '推荐' : undefined,
+  feats: parseFeats(tier.featuresJson),
+})));
 
 const compareRows: CompareRow[] = [
   { label: 'AI 识别额度', free: true, freeText: '10 次/月', pro: true, proText: '无限次' },
@@ -268,46 +272,83 @@ const compareRows: CompareRow[] = [
   { label: '服药/到期提醒', free: true, freeText: '免费', pro: true, proText: '免费' },
 ];
 
-const selectedPlanObj = computed<Plan>(() => plans.find(p => p.key === selected.value) || plans[1]!);
+const selectedPlanObj = computed<Plan>(() => plans.value.find(p => p.key === selected.value) || plans.value[0] || {
+  key: '',
+  name: '会员',
+  price: '¥0',
+  unit: '',
+  note: '',
+  baseline: true,
+  hot: false,
+  feats: [],
+});
+
+/** 是否有效会员：以服务端订阅为准 */
+const isMember = computed<boolean>(() => !!subscription.value?.endTime);
 
 const ctaText = computed<string>(() =>
-  selected.value === 'family' ? '开通家庭组 · ¥68/年' : '开通会员 · ¥48/年 · 首月 ¥1 试用');
+  selectedPlanObj.value.baseline ? '免费版无需开通' : `开通 ${selectedPlanObj.value.name} · ${selectedPlanObj.value.price}${selectedPlanObj.value.unit}`);
 const ctaNote = computed<string>(() =>
-  selected.value === 'family' ? '选中家庭组时文案为「开通家庭组 · ¥68/年」' : '首月 ¥1 试用，试用到期前 3 天提醒');
+  selectedPlanObj.value.baseline ? '免费版为当前基线，不可购买' : '权益自支付成功后立即生效');
 
-const expireText = computed<string>(() => dotDate(settingStore.planExpireAt || addDays(365)));
-const planTitle = computed<string>(() => (planTier.value === 'family' ? '家庭组' : '会员年费'));
+const expireText = computed<string>(() => String(subscription.value?.endTime || '').slice(0, 10));
+const planTitle = computed<string>(() => {
+  const tier = tiers.value.find(item => String(item.id) === String(subscription.value?.planId));
+  return tier?.planName || '会员';
+});
 
 const autoRenewProxy = computed<boolean>({
-  get: () => settingStore.autoRenew,
-  set: (value: boolean) => settingStore.patch({ autoRenew: value }),
+  get: () => subscription.value?.autoRenew === 1,
+  set: async (value: boolean) => {
+    try {
+      await MemberApi.switchAutoRenew(value);
+      if (subscription.value) {
+        subscription.value.autoRenew = value ? 1 : 0;
+      }
+      uni.showToast({ title: value ? '已开启自动续费' : '已关闭自动续费', icon: 'none' });
+    }
+    catch (error: any) {
+      uni.showToast({ title: error?.msg || '设置失败', icon: 'none' });
+    }
+  },
 });
 
-const resultTitle = computed<string>(() =>
-  payResult.value === 'success' ? '开通成功' : payResult.value === 'fail' ? '支付失败' : '已取消支付');
-const resultSub = computed<string>(() =>
-  payResult.value === 'success'
-    ? '会员权益已生效，AI 识别已升级为无限次。'
-    : payResult.value === 'fail'
-      ? '扣费未成功，本次开通未生效，权益保留至到期日。'
-      : '你已关闭支付页，本次未开通，权益保留至到期日。');
-const resultPlanName = computed<string>(() => `${selectedPlanObj.value.name}年费`);
-const resultPaid = computed<string>(() =>
-  payResult.value === 'success' ? '¥1（首月试用）' : payResult.value === 'fail' ? '¥0（未扣费）' : '¥0（未支付）');
-const resultNext = computed<string>(() => {
-  const date = dotDate(addDays(365));
-  return payResult.value === 'success' ? `${date} · ¥48/年` : '—';
+const resultTitle = computed<string>(() => {
+  if (payResult.value === 'success') {
+    return '开通成功';
+  }
+  if (payResult.value === 'pending') {
+    return '订单待支付';
+  }
+  return payResult.value === 'fail' ? '支付失败' : '已取消支付';
 });
+const resultSub = computed<string>(() => {
+  if (payResult.value === 'success') {
+    return '会员权益已生效，AI 识别已升级为无限次。';
+  }
+  if (payResult.value === 'pending') {
+    return '订单已创建并保存为待支付，支付通道接入后完成扣费即自动开通。';
+  }
+  return payResult.value === 'fail'
+    ? '扣费未成功，本次开通未生效，权益保留至到期日。'
+    : '你已关闭支付页，本次未开通，权益保留至到期日。';
+});
+const resultPlanName = computed<string>(() => `${selectedPlanObj.value.name}${selectedPlanObj.value.unit}`);
+const resultPaid = computed<string>(() =>
+  payResult.value === 'pending' ? `${selectedPlanObj.value.price}（待支付）` : '¥0');
+const resultNext = computed<string>(() => (payResult.value === 'success' ? `${expireText.value || '—'} · 自动续费` : '—'));
 
 // 距到期天数：驱动到期提醒横幅文案
 const daysLeft = computed<number>(() => {
-  const dateStr = settingStore.planExpireAt;
-  if (!dateStr) {
+  const end = subscription.value?.endTime;
+  if (!end) {
     return Number.NaN;
   }
-  const target = new Date(`${dateStr.replace(/-/g, '/')} 00:00:00`).getTime();
-  const base = new Date(`${addDays(0).replace(/-/g, '/')} 00:00:00`).getTime();
-  return Math.round((target - base) / 86400000);
+  const target = new Date(String(end).replace(/-/g, '/')).getTime();
+  if (Number.isNaN(target)) {
+    return Number.NaN;
+  }
+  return Math.ceil((target - Date.now()) / 86400000);
 });
 
 function selectPlan(plan: Plan): void {
@@ -318,33 +359,42 @@ function selectPlan(plan: Plan): void {
   selected.value = plan.key;
 }
 
-// 本地模拟支付：成功即写入会员态（无后端，接口应在真实项目里替换此处）
-function handlePay(): void {
-  if (selectedPlanObj.value.baseline) {
+/** 下单：服务端按 planId 回查金额，支付通道未接入时订单落库为待支付 */
+async function handlePay(): Promise<void> {
+  const plan = selectedPlanObj.value;
+  if (plan.baseline || plan.id == null) {
     return;
   }
-  const tier: PlanTier = selected.value === 'family' ? 'family' : 'pro';
-  planTier.value = tier;
-  uni.setStorageSync(PLAN_TIER_KEY, tier);
-  settingStore.patch({
-    plan: 'member' as PlanLevel,
-    planExpireAt: addDays(365),
-    autoRenew: true,
-    quotaTotal: 9999,
-    quotaUsed: 0,
-  });
-  payResult.value = 'success';
-  showResult.value = true;
+  uni.showLoading({ title: '创建订单', mask: true });
+  try {
+    const no = await MemberApi.createOrder({
+      planId: plan.id,
+      // 支付渠道 0 iOS 内购 / 1 微信
+      payChannel: payMethod.value === 'apple' ? 0 : 1,
+      autoRenew: 1,
+    });
+    orderNo.value = no;
+    uni.hideLoading();
+    payResult.value = 'pending';
+    showResult.value = true;
+  }
+  catch (error: any) {
+    uni.hideLoading();
+    uni.showToast({ title: error?.msg || '下单失败', icon: 'none' });
+  }
 }
 
-function handleCloseRenew(): void {
-  settingStore.patch({ autoRenew: false });
-  uni.showToast({ title: '已关闭自动续费', icon: 'none' });
-}
-
-// 结果态预览（本地状态机演示，不落库）
-function previewResult(type: PayResultState): void {
-  payResult.value = type;
+async function handleCloseRenew(): Promise<void> {
+  try {
+    await MemberApi.switchAutoRenew(false);
+    if (subscription.value) {
+      subscription.value.autoRenew = 0;
+    }
+    uni.showToast({ title: '已关闭自动续费', icon: 'none' });
+  }
+  catch (error: any) {
+    uni.showToast({ title: error?.msg || '设置失败', icon: 'none' });
+  }
 }
 
 function handleContinue(): void {
@@ -357,12 +407,35 @@ function handleContinue(): void {
 }
 
 function handleRestorePurchase(): void {
-  uni.showToast({ title: '正在恢复购买…', icon: 'none' });
+  uni.showToast({ title: 'App 内购恢复需在正式包中使用', icon: 'none' });
+}
+
+/** 拉在售方案与当前订阅 */
+async function loadMember(): Promise<void> {
+  try {
+    const [tierList, sub] = await Promise.all([
+      MemberApi.tiers(),
+      MemberApi.currentSubscription(),
+    ]);
+    tiers.value = tierList || [];
+    subscription.value = sub || null;
+    if (!selected.value) {
+      const first = plans.value.find(plan => !plan.baseline);
+      selected.value = first?.key || plans.value[0]?.key || '';
+    }
+  }
+  catch (error: any) {
+    uni.showToast({ title: error?.msg || '会员信息加载失败', icon: 'none' });
+  }
 }
 
 onShow(async () => {
   // 未登录时由 hooks/use-permission 处理跳转
-  await usePermission();
+  const ok = await usePermission();
+  if (!ok) {
+    return;
+  }
+  await loadMember();
 });
 </script>
 

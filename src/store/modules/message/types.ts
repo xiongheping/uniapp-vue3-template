@@ -3,8 +3,8 @@
  * 原型对应：14 消息中心 / 15 通知频控 / 自定义 tabBar 角标
  */
 
-/** 角标类型：总未读 / P0 必达未读 */
-export type BadgeType = 'total' | 'p0';
+/** 角标类型：总未读 / P0 必达未读 / 不显示 */
+export type BadgeType = 'total' | 'p0' | 'none';
 
 /** 消息级别：P0 必达（服药提醒）/ P1 重要 / P2 一般 */
 export type MessageLevel = 'P0' | 'P1' | 'P2';

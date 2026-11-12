@@ -32,11 +32,11 @@
           </text>
         </view>
         <view v-if="targetOf(msg)" class="x-btns row msg-must__btns">
-          <x-button text="✓ 已服用" small @click="quickTake(msg)" />
+          <x-button class="msg-must__btn" text="✓ 已服用" small @click="quickTake(msg)" />
           <x-button
+            class="msg-must__btn msg-snooze"
             type="ghost"
             small
-            class="msg-snooze"
             :disabled="snoozeBlocked(msg)"
             :text="snoozeText(msg)"
             @click="quickSnooze(msg)"
@@ -111,7 +111,7 @@
       </view>
     </template>
 
-    <x-empty v-if="!list.length" emoji="📭" title="消息已清空" sub="P0 服药提醒会第一时间出现在这里" />
+    <x-empty v-if="!loading && !list.length" emoji="📭" title="暂无消息" sub="新的通知会第一时间出现在这里" />
 
     <x-note type="blue">
       👆 P0 必达通知无左滑，不可被滑动消除；点击卡片进入打卡页，状态与用药 Tab 实时同步。
@@ -150,6 +150,8 @@ const mustList = computed<MessageRecord[]>(() => messageStore.mustList);
 const digestList = computed<MessageRecord[]>(() => messageStore.digestList.filter(item => item.group === 'digest'));
 const historyList = computed<MessageRecord[]>(() => messageStore.digestList.filter(item => item.group !== 'digest'));
 const unreadP0 = computed<number>(() => messageStore.unreadP0);
+/** 首次进入的云端拉取中：避免空态抢先闪现 */
+const loading = ref<boolean>(true);
 
 const silentText = computed<string>(() => {
   const raw = String(settingStore.silentUntil || '');
@@ -319,8 +321,9 @@ function handleLongPress(msg: MessageRecord) {
 }
 
 function handleReadAll() {
+  const beforeP0 = unreadP0.value;
   messageStore.readAll();
-  uni.showToast({ title: `已读全部（P0 未读 ${unreadP0.value} → 0）`, icon: 'none' });
+  uni.showToast({ title: `已读全部（P0 未读 ${beforeP0} → 0）`, icon: 'none' });
 }
 
 function handleOpenNotify() {
@@ -352,6 +355,14 @@ function gotoFrequency() {
 onShow(async () => {
   // onShow 阶段补校验路由权限（无权限时由 hooks/use-permission 处理跳转）
   await usePermission();
+  // 拉取云端消息（GET /app/xq/notification/list），未登录时保留本地缓存
+  loading.value = true;
+  try {
+    await messageStore.fetchList();
+  }
+  finally {
+    loading.value = false;
+  }
 });
 </script>
 
@@ -418,6 +429,17 @@ onShow(async () => {
 
 .msg-must__btns {
   margin-top: 16rpx;
+
+  :deep(.x-button) {
+    margin-top: 0;
+  }
+}
+
+/* 双按钮等宽平铺：小程序端 class 落在组件宿主节点，全局 `.x-btns.row > .x-button`
+   选不中，需显式给宿主 flex:1 */
+.msg-must__btn {
+  flex: 1;
+  min-width: 0;
 }
 
 /* 「稍后15分」弱化 ghost（原型 14：#8A93A5 / #E4E8F0） */

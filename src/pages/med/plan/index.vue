@@ -2,8 +2,8 @@
   <x-page>
     <x-nav-bar title="用药提醒" :right-icon="form.id ? 'more' : ''" @right="openMore" />
 
-    <x-note type="blue">
-      💡 点头部「⋯」展开：
+    <x-note type="blue" icon="lightbulb">
+      点头部「⋯」展开：
       <text class="mp-b">
         查看说明书
       </text>
@@ -14,20 +14,21 @@
       （红色 · 需二次确认）。
     </x-note>
 
-    <!-- 基本信息（原型 11c：💊 药名 · 说明书 › / 服药类型） -->
+    <!-- 基本信息（原型 11c：药名 · 说明书 › / 服药类型） -->
     <x-card>
-      <x-field label="💊 药品名称">
+      <x-field label="药品名称" icon="pill" icon-color="#C77700">
         <view class="mp-inline">
           <input v-model="form.name" class="mp-input mp-input--flex" placeholder="填写药品名称">
-          <text class="mp-link" @click="gotoLeaflet">
-            📄 说明书 ›
-          </text>
+          <view class="mp-link" @click="gotoLeaflet">
+            <x-icon class="mp-link__ico" name="file-text" :size="26" />
+            <text>说明书 ›</text>
+          </view>
         </view>
       </x-field>
       <x-field label="服药类型" last>
         <view class="mp-chips">
-          <x-chip small text="⏰ 按时" :active="form.type === 'ontime'" @click="form.type = 'ontime'" />
-          <x-chip small text="⚖️ 按需" :active="form.type === 'prn'" @click="form.type = 'prn'" />
+          <x-chip small icon="clock" text="按时" :active="form.type === 'ontime'" @click="form.type = 'ontime'" />
+          <x-chip small icon="scale" text="按需" :active="form.type === 'prn'" @click="form.type = 'prn'" />
         </view>
       </x-field>
     </x-card>
@@ -65,8 +66,9 @@
 
     <!-- 按时：服用时段 -->
     <template v-if="form.type === 'ontime'">
-      <view class="x-section-title">
-        ⏰ 服用时段（按时模式）
+      <view class="x-section-title mp-sec">
+        <x-icon name="clock" :size="28" color="#4F7CFF" />
+        <text>服用时段（按时模式）</text>
       </view>
       <view v-for="(dose, index) in form.doses" :key="dose.id || `new-${index}`" class="mp-dose">
         <view class="mp-dose__hd" hover-class="mp-dose__hd--hover" @tap="toggleDose(index)">
@@ -117,16 +119,17 @@
           </x-field>
         </view>
       </view>
-      <x-button type="ghost" text="＋ 添加时间点" icon="plus" @click="addDose" />
-      <x-note type="blue">
-        💡 切到「按需」后，上方替换为：每日最大剂量 / 最小间隔 / PRN 原因（疼痛/发热等），不显示固定时段。
+      <x-button type="ghost" text="＋ 添加时间点" @click="addDose" />
+      <x-note type="blue" icon="lightbulb">
+        切到「按需」后，上方替换为：每日最大剂量 / 最小间隔 / PRN 原因（疼痛/发热等），不显示固定时段。
       </x-note>
     </template>
 
     <!-- 按需 -->
     <template v-else>
-      <view class="x-section-title">
-        ⚖️ 按需服用
+      <view class="x-section-title mp-sec">
+        <x-icon name="scale" :size="28" color="#4F7CFF" />
+        <text>按需服用</text>
       </view>
       <x-card>
         <x-field label="每日最大剂量">
@@ -176,7 +179,7 @@
           <x-switch :checked="form.course.autoStop !== false" @change="(value: boolean) => (form.course.autoStop = value)" />
         </x-field>
       </template>
-      <x-field label="📦 库存">
+      <x-field label="库存" icon-color="#4F7CFF">
         <x-quantity
           :text="`${form.stock.have}/${form.stock.total} ${form.stock.unit}`"
           @decrease="changeStock(-1)"
@@ -200,13 +203,14 @@
         />
       </view>
       <x-field label="可见范围" last>
-        <text class="mp-vis" @click="visOpen = !visOpen">
-          🔒 {{ form.visibility === 'family' ? '家人可见' : '仅自己' }} ›
-        </text>
+        <view class="mp-vis" @click="visOpen = !visOpen">
+          <x-icon class="mp-vis__ico" name="lock" :size="26" />
+          <text>{{ form.visibility === 'family' ? '家人可见' : '仅自己' }} ›</text>
+        </view>
       </x-field>
       <view v-if="visOpen" class="mp-chips mp-chips--left">
         <x-chip small text="仅自己" :active="form.visibility === 'self'" @click="form.visibility = 'self'" />
-        <x-chip small text="👥 家人可见" :active="form.visibility === 'family'" @click="form.visibility = 'family'" />
+        <x-chip small icon="users" text="家人可见" :active="form.visibility === 'family'" @click="form.visibility = 'family'" />
       </view>
     </x-card>
 
@@ -219,8 +223,8 @@
           <x-switch :checked="form.enabled" @change="(value: boolean) => (form.enabled = value)" />
         </view>
       </x-field>
-      <x-note v-if="nextHint" type="blue">
-        💡 {{ nextHint }}
+      <x-note v-if="nextHint" type="blue" icon="lightbulb">
+        {{ nextHint }}
       </x-note>
     </x-card>
 
@@ -253,17 +257,22 @@
         </text>
         <textarea v-model="form.instruction.contraindications" class="mp-textarea" placeholder="对本品过敏者禁用" />
       </view>
-      <x-note type="blue">
-        💡 摘录逐字来自说明书，供打卡页与「说明书」页展示；不构成用药建议。
+      <x-note type="blue" icon="lightbulb">
+        摘录逐字来自说明书，供打卡页与「说明书」页展示；不构成用药建议。
       </x-note>
     </x-card>
 
     <x-button v-if="form.id" type="danger" text="删除计划" icon="trash" @click="confirmRemove" />
 
     <template #sticky>
-      <view class="x-btns row">
-        <x-button type="ghost" text="取消" @click="handleCancel" />
-        <x-button :disabled="!canSave" :text="canSave ? '保存服用计划' : saveBlockText" @click="handleSave" />
+      <view class="x-btns row mp-sticky__row">
+        <x-button class="mp-sticky__act" type="ghost" text="取消" @click="handleCancel" />
+        <x-button
+          class="mp-sticky__act"
+          :disabled="!canSave"
+          :text="canSave ? '保存服用计划' : saveBlockText"
+          @click="handleSave"
+        />
       </view>
     </template>
 
@@ -613,14 +622,22 @@ function payload() {
   };
 }
 
-function handleSave() {
+async function handleSave() {
   if (!canSave.value) {
     uni.showToast({ title: saveBlockText.value, icon: 'none' });
     return;
   }
-  medicineStore.savePlan(payload());
-  uni.showToast({ title: '服用计划已保存', icon: 'none' });
-  setTimeout(goBack, 400);
+  uni.showLoading({ title: '保存中', mask: true });
+  try {
+    await medicineStore.savePlan(payload());
+    uni.hideLoading();
+    uni.showToast({ title: '服用计划已保存', icon: 'none' });
+    setTimeout(goBack, 400);
+  }
+  catch (error: any) {
+    uni.hideLoading();
+    uni.showToast({ title: error?.msg || '保存失败，请稍后重试', icon: 'none' });
+  }
 }
 
 function goBack() {
@@ -663,11 +680,16 @@ function confirmRemove() {
     content: `「${plan ? plan.name : form.name}」的提醒与今日之后的排班会一并删除，历史记录保留。`,
     confirmText: '删除计划',
     confirmColor: '#FA5151',
-    success: ({ confirm }) => {
+    success: async ({ confirm }) => {
       if (confirm) {
-        medicineStore.removePlan(form.id);
-        uni.showToast({ title: '计划已删除', icon: 'none' });
-        setTimeout(goBack, 300);
+        try {
+          await medicineStore.removePlan(form.id);
+          uni.showToast({ title: '计划已删除', icon: 'none' });
+          setTimeout(goBack, 300);
+        }
+        catch (error: any) {
+          uni.showToast({ title: error?.msg || '删除失败，请稍后重试', icon: 'none' });
+        }
       }
     },
   });
@@ -685,6 +707,10 @@ onLoad(async (options: Record<string, string> = {}) => {
   const ok = await usePermission();
   if (!ok) {
     return;
+  }
+  // 编辑态需要完整计划（疗程/库存/说明书），先按计划ID拉一次远端数据
+  if (options.planId) {
+    await medicineStore.fetchPlans();
   }
   const plan = options.planId ? medicineStore.planById(options.planId) : null;
   fill(plan);
@@ -747,10 +773,17 @@ onLoad(async (options: Record<string, string> = {}) => {
 }
 
 .mp-link {
+  display: flex;
   flex-shrink: 0;
+  gap: 6rpx;
+  align-items: center;
   font-size: var(--fs-sub);
   font-weight: 600;
   color: var(--color-primary);
+}
+
+.mp-link__ico {
+  flex-shrink: 0;
 }
 
 .mp-textarea {
@@ -781,11 +814,18 @@ onLoad(async (options: Record<string, string> = {}) => {
   padding: 4rpx 0 20rpx;
 }
 
-/* 可见范围值（原型 11c：紫色 🔒 仅自己 ›） */
+/* 可见范围值（原型 11c：紫色 锁图标 仅自己 ›） */
 .mp-vis {
+  display: flex;
+  gap: 6rpx;
+  align-items: center;
   font-size: var(--fs-sub);
   font-weight: 600;
   color: #7b3ff2;
+}
+
+.mp-vis__ico {
+  flex-shrink: 0;
 }
 
 .mp-block {
@@ -894,5 +934,25 @@ onLoad(async (options: Record<string, string> = {}) => {
   font-size: var(--fs-sub);
   font-weight: 600;
   color: var(--color-text);
+}
+
+/* 分区标题：vu-icons + 文案 */
+.mp-sec {
+  display: flex;
+  gap: 8rpx;
+  align-items: center;
+}
+
+.mp-sticky__row {
+  :deep(.x-button) {
+    margin-top: 0;
+  }
+}
+
+/* 双按钮等宽平铺：小程序端 class 落在组件宿主节点，全局 `.x-btns.row > .x-button`
+   选不中，需显式给宿主 flex:1 */
+.mp-sticky__act {
+  flex: 1;
+  min-width: 0;
 }
 </style>

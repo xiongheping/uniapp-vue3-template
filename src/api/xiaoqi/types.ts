@@ -1,5 +1,5 @@
 /**
- * 业务接口公共类型（对接 /xiaoqi/** 资源服务器保护路径）
+ * 业务接口公共类型（对接 /app/xq/** 资源服务器保护路径）
  */
 import type { IPageResult } from '@/utils/request/types';
 

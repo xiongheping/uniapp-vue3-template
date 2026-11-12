@@ -24,9 +24,9 @@
         </picker>
       </view>
 
-      <view class="x-btns row xtp__btns">
-        <x-button type="ghost" text="取消" @click="onCancel" />
-        <x-button text="确认" @click="onConfirm" />
+      <view class="xtp__btns">
+        <x-button class="xtp__btn" type="ghost" text="取消" @click="onCancel" />
+        <x-button class="xtp__btn" text="确认" @click="onConfirm" />
       </view>
     </view>
   </view>
@@ -156,6 +156,19 @@ function onCancel() {
 }
 
 .xtp__btns {
+  display: flex;
+  gap: 16rpx;
   margin-top: 28rpx;
+
+  /* H5 端 class 落在 x-button 根节点；小程序端落在自定义组件宿主节点，两端都能等分 */
+  .xtp__btn {
+    flex: 1;
+    margin-top: 0;
+  }
+
+  /* 小程序端内部按钮仍带默认上间距，需单独清零 */
+  :deep(.x-button) {
+    margin-top: 0;
+  }
 }
 </style>

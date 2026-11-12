@@ -5,7 +5,7 @@
       <view class="xnb__side">
         <slot name="left">
           <view v-if="back" class="xnb__back x-tap-opacity" hover-class="x-tap-opacity--hover" :hover-start-time="0" @tap="handleBack">
-            <x-icon :name="back === 'close' ? 'x' : 'arrow-l'" :size="44" :color="navColor" />
+            <x-icon :name="back === 'close' ? 'x' : 'arrow-l'" :size="40" :color="navColor" />
           </view>
         </slot>
       </view>
@@ -39,9 +39,11 @@ interface Props {
   back?: boolean | 'back' | 'close';
   rightIcon?: string;
   rightText?: string;
+  /** 返回前钩子：返回 false 时阻止本次返回（用于未保存确认） */
+  beforeBack?: () => boolean;
 }
 
-const _props = withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   title: '',
   back: 'back' as const,
   rightIcon: '',
@@ -54,6 +56,9 @@ const { isDark } = useTheme();
 const navColor = computed<string>(() => (isDark.value ? '#F0F2F6' : '#1A2233'));
 
 function handleBack() {
+  if (props.beforeBack && !props.beforeBack()) {
+    return;
+  }
   uni.navigateBack({
     fail: () => {
       uni.redirectTo({ url: '/pages/tab/home/index' });

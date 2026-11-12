@@ -315,6 +315,7 @@ onShow(async () => {
   if (!ok) {
     return;
   }
+  await Promise.all([medicineStore.fetchPlans(), medicineStore.fetchToday()]);
   startTimer();
 });
 

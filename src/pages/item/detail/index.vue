@@ -1,5 +1,6 @@
 <template>
-  <x-page>
+  <!-- reserve：吸底操作条占位（24+72rpx ≈ 58px，底部安全区由 reserve 公式附加），避免内容滚动到底被遮挡 -->
+  <x-page :reserve="58">
     <!-- 物品不存在 -->
     <template v-if="!item">
       <x-nav-bar title="物品详情" back="back" />
@@ -16,12 +17,11 @@
       <!-- 头图卡 -->
       <x-card flat>
         <view class="dt-hero">
-          <text class="dt-hero__emoji">
-            {{ heroEmoji }}
-          </text>
-          <text v-if="item.photo" class="dt-hero__shot">
-            📷 拍摄于 {{ shotDate }}
-          </text>
+          <x-icon :name="heroIcon" :size="150" color="#4F7CFF" />
+          <view v-if="item.photo" class="dt-hero__shot">
+            <x-icon name="camera" :size="24" color="#ffffff" />
+            <text>拍摄于 {{ shotDate }}</text>
+          </view>
         </view>
         <view class="dt-hero__body">
           <view class="dt-hero__name">
@@ -68,8 +68,8 @@
           <x-quantity :model-value="item.qty" :text="qtyText" @decrease="changeQty(-1)" @increase="changeQty(1)" />
         </view>
         <x-field label="提醒设置" icon="bell" :value="remindSummary" tone="primary" chevron @click="showMore = true" />
-        <x-field label="存放位置" icon="package" :value="item.location || '未设置'" chevron @click="goEdit" />
-        <x-field label="可见范围" icon="lock" :value="visText" tone="purple" chevron @click="goEdit" />
+        <x-field label="存放位置" icon="fl:location-ripple" :value="item.location || '未设置'" chevron @click="goEdit" />
+        <x-field label="可见范围" :icon="visIcon" :value="visText" tone="purple" chevron @click="goEdit" />
       </x-card>
 
       <!-- 提醒计划：原型为「图标 + 日期提醒 + 开关/只读」行，非时间轴 -->
@@ -98,27 +98,17 @@
     </template>
 
     <template v-if="item" #sticky>
-      <view class="dt-sticky x-safe-bottom">
-        <view class="dt-sticky__row">
-          <x-button type="ghost" small icon="pencil" text="编辑" @click="goEdit" />
-          <x-button
-            type="ghost"
-            small
-            icon="check"
-            text="已用完"
-            class="dt-sticky__used"
-            style="color: #52c41a; border-color: #c9e9c9;"
-            @click="onArchiveUsed"
-          />
-        </view>
+      <view class="dt-sticky">
+        <x-button type="ghost" small icon="edit" text="编辑" class="dt-sticky__act" @click="goEdit" />
         <x-button
-          type="danger"
+          type="ghost"
           small
-          icon="trash"
-          class="dt-sticky__trash"
-          style="width: 96rpx; padding: 0;"
-          @click="showTrash = true"
+          icon="circle-check"
+          text="已用完"
+          class="dt-sticky__act dt-sticky__act--used"
+          @click="onArchiveUsed"
         />
+        <x-button type="danger" small icon="trash" text="删除" class="dt-sticky__act" @click="showTrash = true" />
       </view>
     </template>
 
@@ -146,23 +136,25 @@
         <x-button type="gray" text="取消" @click="showTrash = false" />
       </x-sheet>
 
-      <!-- 更多操作 -->
+      <!-- 更多操作（2 列平铺） -->
       <x-sheet v-model:show="showMore" title="更多操作">
-        <view class="dt-more" @click="onPostpone">
-          <x-icon name="calendar" :size="40" color="#4F7CFF" />
-          <text>延期 30 天</text>
-        </view>
-        <view class="dt-more" @click="goEdit">
-          <x-icon name="pencil" :size="40" color="#4F7CFF" />
-          <text>编辑信息</text>
-        </view>
-        <view class="dt-more" @click="onArchiveUsed">
-          <x-icon name="check" :size="40" color="#2E7D32" />
-          <text>移到已用完</text>
-        </view>
-        <view class="dt-more" @click="openTrashFromMore">
-          <x-icon name="trash" :size="40" color="#D93025" />
-          <text>移到已扔</text>
+        <view class="dt-grid">
+          <view class="dt-grid__item" hover-class="dt-grid__item--hover" :hover-start-time="0" @click="onPostpone">
+            <x-icon name="calendar" :size="44" color="#4F7CFF" />
+            <text>延期 30 天</text>
+          </view>
+          <view class="dt-grid__item" hover-class="dt-grid__item--hover" :hover-start-time="0" @click="goEdit">
+            <x-icon name="edit" :size="44" color="#4F7CFF" />
+            <text>编辑信息</text>
+          </view>
+          <view class="dt-grid__item" hover-class="dt-grid__item--hover" :hover-start-time="0" @click="onArchiveUsed">
+            <x-icon name="circle-check" :size="44" color="#2E7D32" />
+            <text>移到已用完</text>
+          </view>
+          <view class="dt-grid__item" hover-class="dt-grid__item--hover" :hover-start-time="0" @click="openTrashFromMore">
+            <x-icon name="trash" :size="44" color="#D93025" />
+            <text>移到已扔</text>
+          </view>
         </view>
         <x-button type="link" text="取消" @click="showMore = false" />
       </x-sheet>
@@ -173,6 +165,7 @@
 <script setup lang="ts">
 import type { ItemCategory, ItemRecord } from '@/store/modules/item/types';
 import { useItemStore } from '@/store';
+import { CATEGORIES } from '@/store/modules/item';
 import { addDays, diffDays, dotDate, dueLabel, shortDate, today } from '@/utils/date';
 
 /**
@@ -198,7 +191,6 @@ interface PlanNode {
 const itemStore = useItemStore();
 
 const CAT_LABEL: Record<ItemCategory, string> = { drug: '药品', skin: '护肤品', food: '食品', other: '其他' };
-const CAT_EMOJI: Record<ItemCategory, string> = { drug: '💊', skin: '🧴', food: '🍪', other: '📦' };
 const STATUS_LABEL: Record<string, string> = { used: '已用完', thrown: '已扔', trashed: '回收站' };
 const PLAN_DAYS = [7, 3, 0];
 
@@ -211,7 +203,8 @@ const item = computed<ItemRecord | null>(() => itemStore.findItem(itemId.value))
 const todayStr = today();
 
 const categoryLabel = computed<string>(() => (item.value ? CAT_LABEL[item.value.category] : '其他'));
-const heroEmoji = computed<string>(() => (item.value ? CAT_EMOJI[item.value.category] : '📦'));
+/** 头图分类图标：与首页分类 chips 同一套 vu-icons（pill/droplet/cookie/package） */
+const heroIcon = computed<string>(() => CATEGORIES.find(c => c.key === item.value?.category)?.icon || 'package');
 const dueText = computed<string>(() => (item.value?.dueDate ? dueLabel(item.value.dueDate) : '未填写'));
 const statusText = computed<string>(() => STATUS_LABEL[item.value?.status ?? ''] ?? '');
 
@@ -261,7 +254,9 @@ const remindSummary = computed<string>(() => {
   return list.map(d => (d === 0 ? '当天' : `提前 ${d} 天`)).join(' / ');
 });
 
-const visText = computed<string>(() => (item.value?.visibility === 'family' ? '👥 家人可见' : '🔒 仅自己'));
+const visText = computed<string>(() => (item.value?.visibility === 'family' ? '家人可见' : '仅自己'));
+/** 可见范围图标：家人可见用 users，仅自己用 lock（x-field 前置图标） */
+const visIcon = computed<string>(() => (item.value?.visibility === 'family' ? 'users' : 'lock'));
 const shotDate = computed<string>(() => shortDate(item.value?.createdAt ?? ''));
 
 const planNodes = computed<PlanNode[]>(() => {
@@ -375,14 +370,13 @@ onLoad((options: Record<string, string> = {}) => {
   background: linear-gradient(135deg, #f0f4ff, #e4ecff);
 }
 
-.dt-hero__emoji {
-  font-size: 112rpx;
-}
-
 .dt-hero__shot {
   position: absolute;
   right: 20rpx;
   bottom: 16rpx;
+  display: flex;
+  gap: 6rpx;
+  align-items: center;
   padding: 4rpx 16rpx;
   font-size: var(--fs-mini);
   color: #ffffff;
@@ -491,25 +485,21 @@ onLoad((options: Record<string, string> = {}) => {
   color: var(--color-text);
 }
 
-/* 吸底：编辑/已用完 + 窄红删除 */
+/* 吸底：编辑 / 已用完 / 删除 三按钮横向平铺 */
 .dt-sticky {
   display: flex;
   gap: 16rpx;
   align-items: center;
 }
 
-.dt-sticky__row {
-  display: flex;
-  flex: 1;
-  gap: 16rpx;
-}
-
-.dt-sticky__row > .x-button {
+.dt-sticky__act {
   flex: 1;
 }
 
-.dt-sticky__trash {
-  width: 96rpx;
+/* 双类提高特异性，覆盖 x-button--ghost 的主题蓝 */
+.dt-sticky .dt-sticky__act--used {
+  color: var(--color-success);
+  border-color: #c9e9c9;
 }
 
 .dt-sheet-sub {
@@ -536,18 +526,30 @@ onLoad((options: Record<string, string> = {}) => {
   color: var(--color-text-sub);
 }
 
-.dt-more {
+/* 更多操作：2 列平铺网格（图标在上文字在下） */
+.dt-grid {
   display: flex;
-  gap: 20rpx;
-  align-items: center;
-  min-height: var(--h-touch);
-  padding: 20rpx 0;
-  font-size: var(--fs-body);
-  color: var(--color-text);
-  border-bottom: 2rpx solid var(--color-divider);
+  flex-wrap: wrap;
+  gap: 16rpx;
+  padding: 8rpx 0 24rpx;
 }
 
-.dt-more:last-of-type {
-  border-bottom: none;
+.dt-grid__item {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  align-items: center;
+  width: calc(50% - 8rpx);
+  padding: 32rpx 0 28rpx;
+  font-size: var(--fs-sub);
+  color: var(--color-text);
+  background: var(--color-fill);
+  border-radius: 20rpx;
+  transition: transform 0.12s ease;
+
+  &:active {
+    transform: scale(0.96);
+  }
 }
 </style>

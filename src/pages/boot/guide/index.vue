@@ -7,9 +7,9 @@
         </text>
       </view>
 
-      <swiper class="guide__swiper" :current="current" :duration="260" @change="onChange">
-        <swiper-item v-for="(slide, index) in slides" :key="index">
-          <view class="slide">
+      <view class="guide__stage" @touchstart="onTouchStart" @touchend="onTouchEnd">
+        <view class="guide__track" :style="trackStyle">
+          <view v-for="(slide, index) in slides" :key="index" class="slide">
             <view class="slide__emoji">
               {{ slide.emoji }}
             </view>
@@ -28,8 +28,8 @@
               <view v-for="(_, di) in slides" :key="di" class="slide__dot" :class="{ on: di === index }" />
             </view>
           </view>
-        </swiper-item>
-      </swiper>
+        </view>
+      </view>
 
       <view class="guide__footer">
         <x-button :text="current === slides.length - 1 ? '开始使用' : '下一步'" @click="next" />
@@ -76,16 +76,47 @@ const slides: GuideSlide[] = [
 
 const current = ref(0);
 
-function onChange(e: UniHelper.SwiperOnChangeEvent) {
-  current.value = e.detail.current;
+/** 用 transform 位移翻页，不依赖原生 swiper 的 current 同步 */
+const trackStyle = computed<string>(() => `transform: translateX(${-current.value * 100}%)`);
+
+/** 手势滑动阈值（px），小于该值视为点击 */
+const SWIPE_MIN = 40;
+let touchStartX = 0;
+let touchStartY = 0;
+
+function goTo(index: number) {
+  current.value = Math.min(Math.max(index, 0), slides.length - 1);
 }
 
 function next() {
   if (current.value < slides.length - 1) {
-    current.value += 1;
+    goTo(current.value + 1);
     return;
   }
   finish();
+}
+
+function onTouchStart(e: TouchEvent) {
+  const touch = e.touches[0];
+  if (!touch) {
+    return;
+  }
+  touchStartX = touch.clientX;
+  touchStartY = touch.clientY;
+}
+
+function onTouchEnd(e: TouchEvent) {
+  const touch = e.changedTouches[0];
+  if (!touch) {
+    return;
+  }
+  const dx = touch.clientX - touchStartX;
+  const dy = touch.clientY - touchStartY;
+  // 只响应横向滑动，避免与纵向滚动冲突
+  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) <= Math.abs(dy)) {
+    return;
+  }
+  goTo(current.value + (dx < 0 ? 1 : -1));
 }
 
 function finish() {
@@ -114,12 +145,22 @@ function finish() {
   color: var(--color-primary);
 }
 
-.guide__swiper {
+.guide__stage {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.guide__track {
+  display: flex;
+  height: 100%;
+  transition: transform var(--dur-normal) var(--ease-out);
 }
 
 .slide {
+  box-sizing: border-box;
   display: flex;
+  flex: 0 0 100%;
   flex-direction: column;
   align-items: center;
   justify-content: center;

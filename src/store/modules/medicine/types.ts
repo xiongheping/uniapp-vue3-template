@@ -91,6 +91,8 @@ export interface DoseRecord {
   status: DoseStatus;
   /** 服用时间 HH:mm */
   takenAt?: string;
+  /** 云端记录ID（撤销打卡需要） */
+  recordId?: string;
   /** 撤销窗口截止时间戳（ms），5 分钟 */
   undoUntil?: number;
   /** 稍后提醒时间 HH:mm */

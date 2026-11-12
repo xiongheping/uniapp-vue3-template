@@ -23,6 +23,8 @@ export interface ItemRecord {
   id: string;
   name: string;
   category: ItemCategory;
+  /** 云端原始分类 id（分类名与本地桥接失败时，更新同步用其回退） */
+  cloudCategoryId?: number | string;
   qty: number;
   /** 规格，如「1 盒 5 片」 */
   spec?: string;
@@ -53,6 +55,8 @@ export interface ItemRecord {
 export interface ItemDraft {
   name: string;
   category: ItemCategory;
+  /** 选中的云端分类 id（自定义分类名称无法与本地 label 桥接时优先使用） */
+  cloudCategoryId?: number | string;
   qty: number;
   location?: string;
   produceDate?: string;

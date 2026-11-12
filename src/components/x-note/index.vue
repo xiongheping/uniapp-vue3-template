@@ -1,6 +1,10 @@
 <template>
-  <view class="xnt" :class="type ? `xnt--${type}` : ''">
-    <slot />
+  <view class="xnt" :class="[type ? `xnt--${type}` : '', { 'xnt--ico': !!icon }]">
+    <x-icon v-if="icon" :name="icon" :size="28" class="xnt__ico" />
+    <view v-if="icon" class="xnt__body">
+      <slot />
+    </view>
+    <slot v-else />
   </view>
 </template>
 
@@ -10,9 +14,11 @@
  */
 interface Props {
   type?: '' | 'blue' | 'green' | 'red' | 'purple';
+  /** 前置图标（x-icon / vu-icons），颜色跟随便签文字 */
+  icon?: string;
 }
 
-withDefaults(defineProps<Props>(), { type: '' });
+withDefaults(defineProps<Props>(), { type: '', icon: '' });
 </script>
 
 <style lang="scss" scoped>
@@ -49,5 +55,21 @@ withDefaults(defineProps<Props>(), { type: '' });
     background: var(--color-note-purple-bg);
     border-left-color: var(--color-note-purple-bar);
   }
+
+  &.xnt--ico {
+    display: flex;
+    gap: 12rpx;
+    align-items: flex-start;
+  }
+}
+
+.xnt__ico {
+  flex-shrink: 0;
+  margin-top: 6rpx;
+}
+
+.xnt__body {
+  flex: 1;
+  min-width: 0;
 }
 </style>

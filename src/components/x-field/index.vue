@@ -1,7 +1,7 @@
 <template>
   <view class="xf" :class="{ 'xf--last': last }" @tap="emit('click')">
     <view class="xf__k">
-      <x-icon v-if="icon" :name="icon" :size="32" color="#6B7590" />
+      <x-icon v-if="icon" :name="icon" :size="28" :color="iconColor" />
       <text>{{ label }}</text>
     </view>
     <view class="xf__v-wrap">
@@ -10,7 +10,7 @@
           {{ value }}
         </text>
       </slot>
-      <x-icon v-if="chevron" name="chev-r" :size="32" color="#C0C6D2" />
+      <x-icon v-if="chevron" name="chev-r" :size="28" color="#C0C6D2" />
     </view>
   </view>
 </template>
@@ -25,6 +25,8 @@ interface Props {
   /** 值色调：primary / purple / orange */
   tone?: string;
   icon?: string;
+  /** label 前置图标颜色 */
+  iconColor?: string;
   chevron?: boolean;
   last?: boolean;
 }
@@ -33,6 +35,7 @@ withDefaults(defineProps<Props>(), {
   value: '',
   tone: '',
   icon: '',
+  iconColor: '#6B7590',
   chevron: false,
   last: false,
 });

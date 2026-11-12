@@ -28,6 +28,12 @@
       }
     },
     {
+      "path": "pages/tab/plan/index",
+      "style": {
+        "navigationBarTitleText": "计划"
+      }
+    },
+    {
       "path": "pages/tab/message/index",
       "style": {
         "navigationBarTitleText": "消息"
@@ -168,6 +174,60 @@
       ]
     },
     {
+      "root": "pages/plan",
+      "pages": [
+        {
+          "path": "type/index",
+          "style": {
+            "navigationBarTitleText": "添加计划",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "create/index",
+          "style": {
+            "navigationBarTitleText": "自定义计划",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "setting/index",
+          "style": {
+            "navigationBarTitleText": "计划设置",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "medication/index",
+          "style": {
+            "navigationBarTitleText": "用药计划",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "checkin/index",
+          "style": {
+            "navigationBarTitleText": "计划打卡",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "family/index",
+          "style": {
+            "navigationBarTitleText": "家人计划",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "notify/index",
+          "style": {
+            "navigationBarTitleText": "提醒与通知",
+            "navigationStyle": "custom"
+          }
+        }
+      ]
+    },
+    {
       "root": "pages/msg",
       "pages": [
         {
@@ -204,6 +264,20 @@
           }
         },
         {
+          "path": "family/permission/index",
+          "style": {
+            "navigationBarTitleText": "成员权限",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "alias/index",
+          "style": {
+            "navigationBarTitleText": "伪名保护",
+            "navigationStyle": "custom"
+          }
+        },
+        {
           "path": "restore/index",
           "style": {
             "navigationBarTitleText": "备份与恢复",
@@ -235,6 +309,10 @@
     "pages/tab/medicine/index": {
       "network": "all",
       "packages": ["pages/med"]
+    },
+    "pages/tab/plan/index": {
+      "network": "all",
+      "packages": ["pages/plan"]
     }
   },
   "globalStyle": {

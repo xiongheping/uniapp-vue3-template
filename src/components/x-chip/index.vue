@@ -6,7 +6,7 @@
     :hover-start-time="0"
     @tap="emit('click')"
   >
-    <x-icon v-if="icon" :name="icon" :size="26" :color="active ? '#ffffff' : '#5B6478'" />
+    <x-icon v-if="icon" :name="icon" :size="28" :color="active ? '#ffffff' : '#5B6478'" />
     <text>{{ text }}<slot /></text>
   </view>
 </template>

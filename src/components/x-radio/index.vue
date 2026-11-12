@@ -1,5 +1,5 @@
 <template>
-  <view class="xr" :class="{ 'xr--on': checked }" />
+  <view class="xr" :class="[{ 'xr--on': checked }, tone === 'purple' ? 'xr--purple' : '']" />
 </template>
 
 <script setup lang="ts">
@@ -8,9 +8,11 @@
  */
 interface Props {
   checked?: boolean;
+  /** 选中态色调：primary 主色 / purple 紫（家庭转让弹层） */
+  tone?: 'primary' | 'purple';
 }
 
-withDefaults(defineProps<Props>(), { checked: false });
+withDefaults(defineProps<Props>(), { checked: false, tone: 'primary' });
 </script>
 
 <style lang="scss" scoped>
@@ -36,6 +38,14 @@ withDefaults(defineProps<Props>(), { checked: false });
     background: var(--color-primary);
     border-radius: 50%;
     animation: x-fade-up 0.18s var(--ease-out);
+  }
+}
+
+.xr--purple.xr--on {
+  border-color: var(--color-purple);
+
+  &::after {
+    background: var(--color-purple);
   }
 }
 </style>

@@ -91,7 +91,8 @@ const bodyStyle = computed<string>(() =>
   bottom: 0;
   left: 0;
   z-index: 10;
-  padding: 24rpx 32rpx calc(40rpx + env(safe-area-inset-bottom, 0px));
+  /* 底部仅保留 iPhone 安全区，按钮贴屏幕最底边 */
+  padding: 24rpx 32rpx env(safe-area-inset-bottom, 0);
   background: linear-gradient(to top, var(--color-bg) 75%, transparent);
 }
 </style>

@@ -1,7 +1,8 @@
 import type { UserState } from './types';
+import type { ProfileBo } from '@/api/auth/types';
 import { defineStore } from 'pinia';
 import { AuthApi } from '@/api';
-import { clearToken, setTokens } from '@/utils/auth';
+import { clearToken, setToken } from '@/utils/auth';
 
 /** 游客账号 storage 标记（「先逛逛」写入，与 mine 页判定共用） */
 export const GUEST_MODE_KEY = 'guest_mode';
@@ -43,18 +44,22 @@ const useUserStore = defineStore('user', {
     resetInfo() {
       this.$reset();
     },
-    /** 登录成功后统一落令牌 */
-    applyToken(res: { access_token: string; refresh_token?: string }) {
-      setTokens(res.access_token, res.refresh_token);
+    /** 登录成功后落令牌（单令牌，无 refresh） */
+    applyToken(res: { accessToken: string; isGuest?: boolean }) {
+      setToken(res.accessToken);
+      if (res.isGuest) {
+        uni.setStorageSync(GUEST_MODE_KEY, true);
+      }
     },
     /** 短信验证码登录（首次自动注册） */
     async smsLogin(phone: string, smsCode: string) {
       const res = await AuthApi.tokenBySms(phone, smsCode);
       this.applyToken(res);
+      uni.removeStorageSync(GUEST_MODE_KEY);
       await this.fetchInfo();
       return res;
     },
-    /** 微信登录：uni.login 拿 code 换令牌 */
+    /** 微信小程序登录：uni.login 拿 code 换令牌 */
     wechatLogin() {
       return new Promise((resolve, reject) => {
         uni.login({
@@ -67,6 +72,7 @@ const useUserStore = defineStore('user', {
             try {
               const res = await AuthApi.tokenByWechat(result.code);
               this.applyToken(res);
+              uni.removeStorageSync(GUEST_MODE_KEY);
               await this.fetchInfo();
               resolve(res);
             }
@@ -89,7 +95,15 @@ const useUserStore = defineStore('user', {
       uni.setStorageSync(GUEST_MODE_KEY, true);
       return res;
     },
-    /** 拉取当前会员信息 */
+    /** 游客补手机号转注册（会员ID 不变，本地数据无需迁移） */
+    async registerByPhone(phone: string, smsCode: string, nickname?: string) {
+      const res = await AuthApi.registerByPhone(phone, smsCode, nickname);
+      this.applyToken(res);
+      uni.removeStorageSync(GUEST_MODE_KEY);
+      await this.fetchInfo();
+      return res;
+    },
+    /** 拉取当前会员资料 */
     async fetchInfo() {
       const info = await AuthApi.me();
       this.setInfo({
@@ -101,6 +115,12 @@ const useUserStore = defineStore('user', {
         registerType: info.registerType,
       });
       return info;
+    },
+    /** 修改昵称 / 头像（后端成功即同步本地） */
+    async updateProfile(bo: ProfileBo) {
+      await AuthApi.updateProfile(bo);
+      this.setInfo(bo);
+      return true;
     },
     /** 退出登录：吊销令牌 + 清空本地状态 */
     async logout() {

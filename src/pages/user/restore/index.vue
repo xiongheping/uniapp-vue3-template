@@ -42,8 +42,8 @@
 
     <template #sticky>
       <view class="x-btns row">
-        <x-button type="ghost" text="取消" @click="handleCancel" />
-        <x-button text="确认恢复" @click="handleRestore" />
+        <x-button class="rs-btns__act" type="ghost" text="取消" @click="handleCancel" />
+        <x-button class="rs-btns__act" text="确认恢复" @click="handleRestore" />
       </view>
     </template>
   </x-page>
@@ -155,6 +155,12 @@ onShow(async () => {
   font-size: var(--fs-sub);
   font-weight: 600;
   color: var(--color-warning-text);
+}
+
+/* 双按钮等宽平铺：小程序端 class 落在组件宿主节点，全局 `.x-btns.row > .x-button` 选不中 */
+.rs-btns__act {
+  flex: 1;
+  min-width: 0;
 }
 
 .rs-sec {

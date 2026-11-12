@@ -404,6 +404,8 @@ onShow(async () => {
   if (!ok) {
     return;
   }
+  // 登录态下以服务端数据为准：先拿完整计划（疗程/库存），再拿今日时间轴
+  await Promise.all([medicineStore.fetchPlans(), medicineStore.fetchToday()]);
   startTimer();
   // 庆祝动效每次进入只播一次
   if (isAllDone.value) {

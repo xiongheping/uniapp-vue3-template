@@ -2,6 +2,7 @@
 import type { HttpRequestConfig, HttpResponse } from 'uview-plus/libs/luch-request/index';
 import type { IResponse } from './types';
 import Request from 'uview-plus/libs/luch-request/index';
+import { MEMBER_BASE } from '@/api/base';
 import { requestInterceptors, responseInterceptors } from './interceptors';
 
 const http = new Request();
@@ -9,13 +10,8 @@ const http = new Request();
 // 引入拦截器配置
 export function setupRequest() {
   http.setConfig((defaultConfig: HttpRequestConfig) => {
-    /* defaultConfig 为默认全局配置 */
-    defaultConfig.baseURL = import.meta.env.VITE_API_BASE_URL;
-    // #ifdef H5
-    if (import.meta.env.VITE_APP_PROXY === 'true') {
-      defaultConfig.baseURL = import.meta.env.VITE_API_PREFIX;
-    }
-    // #endif
+    /* 默认指向 ruoyi-member-server（认证 / 资料），业务接口按需覆盖 baseURL */
+    defaultConfig.baseURL = MEMBER_BASE;
     return defaultConfig;
   });
   requestInterceptors(http);

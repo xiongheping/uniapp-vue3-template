@@ -86,6 +86,7 @@ watch(
 }
 
 .xsh {
+  box-sizing: border-box;
   width: 100%;
   padding: 20rpx 36rpx;
   padding-bottom: calc(40rpx + env(safe-area-inset-bottom, 0px));

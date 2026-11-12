@@ -10,7 +10,7 @@
     :disabled="disabled"
     @tap="onTap"
   >
-    <x-icon v-if="icon" :name="icon" :size="small ? 30 : 34" :color="type === 'primary' ? '#ffffff' : '#4F7CFF'" />
+    <x-icon v-if="icon" :name="icon" :size="small ? 28 : 32" color="currentColor" />
     <text v-if="text || $slots.default">
       {{ text }}<slot />
     </text>
@@ -52,18 +52,27 @@ function onTap() {
 
 <style lang="scss" scoped>
 .x-button {
+  box-sizing: border-box;
   display: flex;
   gap: 8rpx;
   align-items: center;
   justify-content: center;
   width: 100%;
   min-height: var(--h-btn);
+  /* 小程序 button UA 重置：默认 line-height:2.55 会撑高文字行盒导致图标错位；左右 padding、::after 边框同理 */
+  padding: 0;
+  margin: 0;
   margin-top: 24rpx;
   font-size: var(--fs-btn);
   font-weight: 600;
+  line-height: 1;
   text-align: center;
   border-radius: var(--radius-cell);
   transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-normal) var(--ease-out);
+
+  &::after {
+    border: none;
+  }
 
   &:active {
     opacity: 0.9;

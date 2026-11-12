@@ -10,16 +10,16 @@ export interface TabBarItem {
   text: string;
   icon: string;
   /**
-   * 角标类型：总未读 / P0 必达未读
+   * 角标类型：总未读 / P0 必达未读 / 不显示（原型仅消息 tab 有角标）
    */
   badge: BadgeType;
 }
 
 export const TAB_BAR_LIST: TabBarItem[] = [
-  { path: '/pages/tab/home/index', text: '首页', icon: 'house', badge: 'total' },
-  { path: '/pages/tab/medicine/index', text: '用药', icon: 'pill', badge: 'total' },
+  { path: '/pages/tab/home/index', text: '首页', icon: 'house', badge: 'none' },
+  { path: '/pages/tab/plan/index', text: '计划', icon: 'list-checks', badge: 'none' },
   { path: '/pages/tab/message/index', text: '消息', icon: 'msg', badge: 'p0' },
-  { path: '/pages/tab/mine/index', text: '我的', icon: 'user', badge: 'total' },
+  { path: '/pages/tab/mine/index', text: '我的', icon: 'user', badge: 'none' },
 ];
 
 export const TAB_PATHS = TAB_BAR_LIST.map(item => item.path);

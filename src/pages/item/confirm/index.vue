@@ -1,5 +1,6 @@
 <template>
-  <x-page>
+  <!-- reserve：吸底操作条占位（24+96rpx ≈ 70px，底部安全区由 reserve 公式附加），避免内容滚动到底被遮挡 -->
+  <x-page :reserve="70">
     <x-nav-bar :title="navTitle" :back="false">
       <template #left>
         <view class="cf-back" @click="handleBack">
@@ -38,12 +39,12 @@
         <view class="cf-chips">
           <x-chip
             v-for="c in categories"
-            :key="c.key"
+            :key="c.id ?? c.key"
             small
             :icon="c.icon"
             :text="c.label"
-            :active="form.category === c.key"
-            @click="form.category = c.key"
+            :active="isCategoryActive(c)"
+            @click="selectCategory(c)"
           />
         </view>
       </view>
@@ -53,6 +54,8 @@
         </text>
         <x-quantity
           :model-value="form.qty"
+          editable
+          @update:model-value="(v: number) => (form.qty = Math.max(0, v || 0))"
           @decrease="form.qty = Math.max(0, form.qty - 1)"
           @increase="form.qty += 1"
         />
@@ -98,7 +101,7 @@
             :key="d"
             small
             :text="d === 0 ? '当天' : `前${d}天`"
-            :active="form.remindDays.includes(d)"
+            :active="form.remindDays[0] === d"
             @click="toggleRemind(d)"
           />
         </view>
@@ -125,19 +128,18 @@
         </view>
       </view>
       <view class="cf-row">
-        <text class="cf-row__k">
-          💊 是药品，需服药提醒
-        </text>
+        <view class="cf-row__k cf-row__k--ico">
+          <x-icon name="pill" :size="30" color="#4F7CFF" />
+          <text>是药品，需服药提醒</text>
+        </view>
         <x-switch :checked="form.isDrug" @update:checked="onDrugSwitch" />
       </view>
     </x-card>
 
     <template #sticky>
-      <view class="cf-sticky x-safe-bottom">
-        <view class="x-btns row">
-          <x-button v-if="mode === 'recognize'" type="ghost" icon="camera" text="重拍" @click="toReshoot" />
-          <x-button type="primary" :disabled="!canSave" :text="saveText" @click="onSave" />
-        </view>
+      <view class="cf-sticky">
+        <x-button v-if="mode === 'recognize'" type="ghost" icon="camera" text="重拍" class="cf-sticky__act" @click="toReshoot" />
+        <x-button type="primary" :disabled="!canSave" :text="saveText" class="cf-sticky__act" @click="onSave" />
       </view>
     </template>
 
@@ -163,6 +165,7 @@
 
 <script setup lang="ts">
 import type { ItemCategory, ItemDraft, ItemVisibility } from '@/store/modules/item/types';
+import { ItemApi } from '@/api';
 import { useTheme } from '@/hooks';
 import { useItemStore, useSettingStore } from '@/store';
 import { CATEGORIES } from '@/store/modules/item';
@@ -187,12 +190,16 @@ interface ConfirmForm {
 interface ConfirmDraft {
   mode?: string;
   form?: Record<string, unknown>;
+  /** 自定义分类的云端 id（本地 key 只有 other，恢复草稿时需还原选中项） */
+  categoryId?: number | string;
 }
 
 interface RecognizeData {
   name?: string;
   produceDate?: string;
+  dueDate?: string;
   spec?: string;
+  qty?: number;
 }
 
 const itemStore = useItemStore();
@@ -217,12 +224,70 @@ const form = reactive<ConfirmForm>({
   produceDate: '',
   dueDate: '',
   remindOn: true,
-  remindDays: [7, 3, 0],
+  remindDays: [7],
   visibility: 'self',
   isDrug: false,
 });
 
-const categories = CATEGORIES;
+/** 分类 chips：云端 /app/xq/item/category/list 拉取，本地 CATEGORIES 兜底 */
+interface CategoryChip {
+  key: ItemCategory;
+  label: string;
+  icon: string;
+  /** 云端分类 id；接口不可用时的本地兜底分类没有 */
+  id?: number | string;
+}
+
+const categories = ref<CategoryChip[]>([...CATEGORIES]);
+
+/** 当前选中的云端分类 id（自定义分类无法用本地 key 区分，保存时优先带 id） */
+const categoryId = ref<number | string | undefined>(undefined);
+
+/** 拉取云端分类；categoryName 与本地 CATEGORIES label 桥接得到本地 key，失败保持本地兜底 */
+async function loadCategories() {
+  try {
+    const res = await ItemApi.category.list({ pageNum: 1, pageSize: 100 }, { custom: { toast: false } as any });
+    const rows = (res.rows || []).slice().sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+    if (rows.length) {
+      categories.value = rows.map((vo) => {
+        const local = CATEGORIES.find(c => c.label === vo.categoryName);
+        return { key: local?.key || 'other', label: vo.categoryName, icon: vo.icon || local?.icon || 'package', id: vo.id };
+      });
+      // 默认分类（或本地记录的旧数据没有云端 id）按本地 key 回填选中项
+      if (categoryId.value === undefined) {
+        categoryId.value = categories.value.find(c => c.key === form.category)?.id;
+      }
+    }
+  }
+  catch {
+    // 接口失败时保持本地分类展示
+  }
+}
+
+/** 选中项判定：有云端 id 时按 id 区分（自定义分类的本地 key 都是 other） */
+function isCategoryActive(c: CategoryChip): boolean {
+  if (categoryId.value !== undefined && c.id !== undefined) {
+    return String(c.id) === String(categoryId.value);
+  }
+  return c.key === form.category;
+}
+
+function selectCategory(c: CategoryChip) {
+  form.category = c.key;
+  categoryId.value = c.id;
+}
+
+/** 按本地 key 选中（如打开「是药品」时切到药品分类） */
+function selectCategoryByKey(key: ItemCategory) {
+  const chip = categories.value.find(c => c.key === key);
+  if (chip) {
+    selectCategory(chip);
+  }
+  else {
+    form.category = key;
+    categoryId.value = undefined;
+  }
+}
 const navColor = computed(() => (isDark.value ? '#F0F2F6' : '#1A2233'));
 const navTitle = computed(() => (mode.value === 'edit' ? '编辑物品' : '确认信息'));
 const duePreview = computed(() =>
@@ -239,20 +304,15 @@ function snapshot() {
   initialSnapshot.value = JSON.stringify({ ...form });
 }
 
+/** 提前提醒单选：重复点击已选中项取消选择（remindDays 保留数组结构以兼容云端映射） */
 function toggleRemind(d: number) {
-  const index = form.remindDays.indexOf(d);
-  if (index > -1) {
-    form.remindDays.splice(index, 1);
-  }
-  else {
-    form.remindDays.push(d);
-  }
+  form.remindDays = form.remindDays[0] === d ? [] : [d];
 }
 
 function onDrugSwitch(v: boolean) {
   form.isDrug = v;
   if (v && form.category === 'other') {
-    form.category = 'drug';
+    selectCategoryByKey('drug');
   }
 }
 
@@ -288,6 +348,7 @@ function fill(target: unknown) {
 }
 
 onLoad((options: any = {}) => {
+  loadCategories();
   mode.value = (options.mode || 'manual') as ConfirmMode;
   if (options.id) {
     editId.value = options.id as string;
@@ -295,6 +356,7 @@ onLoad((options: any = {}) => {
     const item = itemStore.findItem(options.id);
     if (item) {
       fill({ ...item, remindOn: true });
+      categoryId.value = item.cloudCategoryId;
     }
     snapshot();
     return;
@@ -305,9 +367,10 @@ onLoad((options: any = {}) => {
       fill({
         name: data.name,
         produceDate: (data.produceDate || '').replace(/\./g, '-'),
+        dueDate: (data.dueDate || '').replace(/\./g, '-'),
         spec: data.spec,
       });
-      form.qty = 1;
+      form.qty = Math.max(1, data.qty ?? 1);
     }
     catch {
       // 数据损坏时留空
@@ -319,6 +382,7 @@ onLoad((options: any = {}) => {
   const draft = uni.getStorageSync(DRAFT_KEY) as ConfirmDraft | '';
   if (draft && draft.mode === 'manual') {
     fill(draft.form);
+    categoryId.value = draft.categoryId;
     draftRestored.value = true;
   }
   snapshot();
@@ -332,6 +396,7 @@ function onSave() {
   const payload: ItemDraft = {
     name: form.name.trim(),
     category: form.category,
+    cloudCategoryId: categoryId.value,
     qty: form.qty,
     location: form.location,
     produceDate: form.produceDate,
@@ -382,7 +447,7 @@ function releaseIfRecognize() {
 }
 
 function leaveSaveDraft() {
-  uni.setStorageSync(DRAFT_KEY, { mode: mode.value, form: { ...form } });
+  uni.setStorageSync(DRAFT_KEY, { mode: mode.value, form: { ...form }, categoryId: categoryId.value });
   releaseIfRecognize();
   showDiscard.value = false;
   uni.navigateBack();
@@ -435,6 +500,13 @@ function toReshoot() {
   color: var(--color-text);
 }
 
+/* 带图标的行标签（图标 + 文本垂直居中） */
+.cf-row__k--ico {
+  display: flex;
+  gap: 8rpx;
+  align-items: center;
+}
+
 .cf-row__input {
   flex: 1;
   min-width: 0;
@@ -450,9 +522,16 @@ function toReshoot() {
   justify-content: flex-end;
 }
 
+/* 吸底操作：横向平铺（重拍 + 保存等宽；单按钮时占满） */
 .cf-sticky {
   display: flex;
-  flex-direction: column;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.cf-sticky__act {
+  flex: 1;
+  margin-top: 0;
 }
 
 .cf-discard-sub {

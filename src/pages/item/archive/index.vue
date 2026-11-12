@@ -35,9 +35,9 @@
               {{ isCourseDone(p) ? '完成' : '进行中' }}
             </x-tag>
           </view>
-          <view class="x-btns row">
-            <x-button type="ghost" small text="📄 记录" @click="gotoPlan(p.id)" />
-            <x-button type="ghost" small text="🛒 再买" @click="rebuy(p.name)" />
+          <view class="ar-btns">
+            <x-button type="ghost" small icon="file-text" text="记录" class="ar-btns__act" @click="gotoPlan(p.id)" />
+            <x-button type="ghost" small icon="bag" text="再买" class="ar-btns__act" @click="rebuy(p.name)" />
           </view>
           <view v-if="idx !== courseList.length - 1" class="ar-divider" />
         </view>
@@ -71,9 +71,9 @@
               </view>
             </view>
           </view>
-          <view class="x-btns row">
-            <x-button type="ghost" small icon="undo" text="恢复" @click="onRestore(it.id)" />
-            <x-button type="danger" small icon="trash" text="彻底删除" @click="onDeleteForever(it.id)" />
+          <view class="ar-btns">
+            <x-button type="ghost" small icon="undo" text="恢复" class="ar-btns__act" @click="onRestore(it.id)" />
+            <x-button type="danger" small icon="trash" text="彻底删除" class="ar-btns__act" @click="onDeleteForever(it.id)" />
           </view>
         </x-card>
       </block>
@@ -106,9 +106,9 @@
                 </x-tag>
               </view>
             </view>
-            <view class="x-btns row">
-              <x-button type="ghost" small icon="undo" text="恢复" @click="onRestore(it.id)" />
-              <x-button type="ghost" small text="移入回收站" class="ar-trashbtn" @click="onTrash(it.id)" />
+            <view class="ar-btns">
+              <x-button type="ghost" small icon="undo" text="恢复" class="ar-btns__act" @click="onRestore(it.id)" />
+              <x-button type="ghost" small text="移入回收站" class="ar-btns__act ar-trashbtn" @click="onTrash(it.id)" />
             </view>
             <view v-if="idx !== usedItems.length - 1" class="ar-divider" />
           </view>
@@ -140,9 +140,9 @@
                 恢复
               </x-tag>
             </view>
-            <view class="x-btns row">
-              <x-button type="ghost" small icon="undo" text="恢复" @click="onRestore(it.id)" />
-              <x-button type="ghost" small text="移入回收站" class="ar-trashbtn" @click="onTrash(it.id)" />
+            <view class="ar-btns">
+              <x-button type="ghost" small icon="undo" text="恢复" class="ar-btns__act" @click="onRestore(it.id)" />
+              <x-button type="ghost" small text="移入回收站" class="ar-btns__act ar-trashbtn" @click="onTrash(it.id)" />
             </view>
             <view v-if="idx !== thrownItems.length - 1" class="ar-divider" />
           </view>
@@ -334,6 +334,18 @@ onLoad((options: Record<string, string> = {}) => {
   font-size: var(--fs-sub);
   font-weight: 700;
   color: var(--color-text-sub);
+}
+
+/* 卡片内操作按钮：横向等宽平铺（页面级 scoped，不依赖全局 .x-btns） */
+.ar-btns {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.ar-btns__act {
+  flex: 1;
+  margin-top: 0;
 }
 
 .ar-trashbtn {

@@ -45,14 +45,14 @@
     <!-- 家庭 / 归档入口（原型 16：仅 3 项） -->
     <x-card>
       <x-cell
-        icon="archive"
+        icon="history"
         title="归档与历史"
         :subtitle="`已用完 ${archiveStats.used} · 已扔 ${archiveStats.thrown} · 已完成疗程 ${archiveStats.course}`"
         chevron
         @click="goArchive"
       />
       <x-cell icon="users" title="家庭与隐私" subtitle="3 位成员 · 默认仅自己可见" chevron @click="goFamily" />
-      <x-cell icon="eye-off" title="长辈模式" subtitle="大字号 · 大按钮 · 简化导航" last>
+      <x-cell icon="accessibility" title="长辈模式" subtitle="大字号 · 大按钮 · 简化导航" last>
         <template #right>
           <x-switch :checked="settingStore.isElder" @change="handleElder" />
         </template>
@@ -62,13 +62,13 @@
     <!-- 数据 / 合规 / 账号（原型 16 第二张卡） -->
     <x-card>
       <x-cell
-        icon="cloud"
+        icon="database-backup"
         title="数据与备份"
         :subtitle="`本地备份 ${backupText} · 云同步未开启`"
         chevron
         @click="goRestore"
       />
-      <x-cell icon="chart" title="消耗统计" subtitle="月度浪费报表 · 会员功能">
+      <x-cell icon="activity" title="消耗统计" subtitle="月度浪费报表 · 会员功能">
         <template #right>
           <x-tag type="orange">
             PRO ›
@@ -76,7 +76,7 @@
         </template>
       </x-cell>
       <x-cell
-        icon="file"
+        icon="file-text"
         title="个人信息收集清单"
         subtitle="查看收集项、用途与第三方共享"
         chevron

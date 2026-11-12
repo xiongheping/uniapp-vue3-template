@@ -12,86 +12,11 @@ import type { ItemCategoryVo, ItemVo } from '@/api/xiaoqi/item';
 import { defineStore } from 'pinia';
 import { ItemApi } from '@/api';
 import { isLogin } from '@/utils/auth';
-import { addDays, diffDays, today } from '@/utils/date';
+import { diffDays, today } from '@/utils/date';
 import storage from '@/utils/storage';
 
 /** 物品列表持久化键 */
 const ITEM_LIST_KEY = 'item_list';
-
-/** 演示数据总开关：仅为「首次启动即能看到 07 首页默认态」服务，接真实接口时置 false */
-const DEMO_ENABLED = true;
-
-/** 演示数据已注入标记（只注入一次） */
-const SEED_KEY = 'item_demo_seeded';
-
-/**
- * 演示物品（offset = 相对今天的到期天数）
- * 覆盖三组：已过期 1 件 / 临期 5 件 / 安全 6 件，与原型 07 的分组口径一致
- */
-const DEMO_ROWS: {
-  name: string;
-  category: ItemCategory;
-  location: string;
-  offset: number;
-  qty: number;
-  /** 归档态演示（原型 19：已用完 / 已扔） */
-  status?: ItemRecord['status'];
-}[] = [
-  { name: '连花清瘟胶囊', category: 'drug', location: '药箱左侧', offset: -18, qty: 1 },
-  { name: '兰蔻小黑瓶精华面膜', category: 'skin', location: '梳妆台第二层', offset: 3, qty: 3 },
-  { name: '阿莫西林胶囊', category: 'drug', location: '药箱左侧', offset: 7, qty: 2 },
-  { name: '布洛芬缓释胶囊', category: 'drug', location: '药箱右侧', offset: 12, qty: 1 },
-  { name: '蒙牛纯牛奶', category: 'food', location: '冰箱门侧', offset: 18, qty: 6 },
-  { name: '修丽可 CE 精华', category: 'skin', location: '梳妆台第一层', offset: 27, qty: 1 },
-  { name: '维生素 C 泡腾片', category: 'drug', location: '药箱左侧', offset: 46, qty: 1 },
-  { name: '雅诗兰黛小棕瓶', category: 'skin', location: '梳妆台第一层', offset: 92, qty: 1 },
-  { name: '云南白药创可贴', category: 'other', location: '玄关抽屉', offset: 150, qty: 1 },
-  { name: '蒙脱石散', category: 'drug', location: '药箱右侧', offset: 210, qty: 5 },
-  { name: '医用外科口罩', category: 'other', location: '玄关抽屉', offset: 280, qty: 20 },
-  { name: '奥利奥饼干', category: 'food', location: '零食柜', offset: 365, qty: 2 },
-  // 以下补齐「✓ 安全 · 23」口径（原型 07 tile 数字），全部 > 30 天
-  { name: '泰诺感冒片', category: 'drug', location: '药箱右侧', offset: 52, qty: 1 },
-  { name: '999 感冒灵颗粒', category: 'drug', location: '药箱左侧', offset: 61, qty: 3 },
-  { name: '藿香正气水', category: 'drug', location: '药箱右侧', offset: 74, qty: 4 },
-  { name: '金嗓子喉片', category: 'drug', location: '药箱左侧', offset: 83, qty: 2 },
-  { name: '维达抽纸', category: 'other', location: '客厅储物柜', offset: 96, qty: 12 },
-  { name: '海露玻璃酸钠滴眼液', category: 'drug', location: '书桌抽屉', offset: 108, qty: 1 },
-  { name: '妮维雅身体乳', category: 'skin', location: '浴室置物架', offset: 121, qty: 1 },
-  { name: '舒肤佳洗手液', category: 'other', location: '浴室置物架', offset: 134, qty: 1 },
-  { name: '金龙鱼食用油', category: 'food', location: '厨房下柜', offset: 146, qty: 1 },
-  { name: '海天生抽', category: 'food', location: '厨房下柜', offset: 158, qty: 1 },
-  { name: '安耐晒防晒霜', category: 'skin', location: '梳妆台第二层', offset: 172, qty: 1 },
-  { name: '珂润面霜', category: 'skin', location: '梳妆台第一层', offset: 188, qty: 1 },
-  { name: '云南白药膏', category: 'drug', location: '药箱右侧', offset: 203, qty: 1 },
-  { name: '农夫山泉矿泉水', category: 'food', location: '阳台储物架', offset: 226, qty: 24 },
-  { name: '滴露消毒液', category: 'other', location: '卫生间下柜', offset: 249, qty: 1 },
-  { name: '六神花露水', category: 'other', location: '阳台储物架', offset: 268, qty: 1 },
-  { name: '帮宝适湿巾', category: 'other', location: '婴儿房抽屉', offset: 292, qty: 6 },
-  // 归档演示：让原型 19（归档与历史）有内容
-  { name: '薇诺娜防晒霜', category: 'skin', location: '梳妆台第二层', offset: -5, qty: 0, status: 'used' },
-  { name: '复方甘草片', category: 'drug', location: '药箱右侧', offset: -120, qty: 0, status: 'thrown' },
-];
-
-/**
- * 生成演示物品；仅在 item_list 从未写入过时调用（用户清空后不再重新注入）
- */
-function seedDemoItems(): ItemRecord[] {
-  return DEMO_ROWS.map((row, index): ItemRecord => ({
-    id: `i-demo-${index + 1}`,
-    name: row.name,
-    category: row.category,
-    qty: row.qty,
-    location: row.location,
-    produceDate: addDays(row.offset - 365),
-    dueDate: addDays(row.offset),
-    remindDays: [7, 3, 0],
-    visibility: 'family',
-    isDrug: row.category === 'drug',
-    status: row.status || 'active',
-    createdAt: addDays(-(DEMO_ROWS.length - index)),
-    updatedAt: today(),
-  }));
-}
 
 /** 分类清单（确认页 chips / 图标映射共用） */
 export const CATEGORIES: { key: ItemCategory; label: string; icon: string }[] = [
@@ -104,7 +29,7 @@ export const CATEGORIES: { key: ItemCategory; label: string; icon: string }[] = 
 /** 临期窗口（天）：0~30 天视为临期 */
 const EXPIRING_WINDOW = 30;
 
-/* ==================== 云端映射（XqItemController /xiaoqi/item） ==================== */
+/* ==================== 云端映射（XqItemController /app/xq/item） ==================== */
 
 /** 云端状态：0在用 1已用完 2已扔 3回收站 */
 const CLOUD_VISIBLE: Record<ItemRecord['visibility'], number> = { self: 0, family: 1 };
@@ -155,6 +80,7 @@ function fromCloud(vo: ItemVo): ItemRecord {
     id: String(vo.id),
     name: vo.itemName,
     category: categoryKeyById(vo.categoryId),
+    cloudCategoryId: vo.categoryId,
     qty: Number(vo.quantity) || 0,
     location: vo.location || undefined,
     produceDate: vo.productionDate || undefined,
@@ -176,7 +102,8 @@ function fromCloud(vo: ItemVo): ItemRecord {
 /** 本地记录/草稿 → XqItemBo（后端 edit 校验 categoryId/itemName 必填，须传全量） */
 function toCloudBo(it: Partial<ItemRecord> & Partial<ItemDraft>): Partial<ItemVo> {
   return {
-    categoryId: it.category ? categoryIdByKey(it.category) : undefined,
+    // 显式选择的云端分类 id 优先（自定义分类名无法桥接本地 label）
+    categoryId: it.cloudCategoryId ?? (it.category ? categoryIdByKey(it.category) : undefined),
     itemName: it.name,
     // 判重用归一化名称；后端 insertBy 当前未自动生成（NOT NULL），前端兜底传入
     normalizedName: it.name ? it.name.trim().toLowerCase() : undefined,
@@ -192,8 +119,10 @@ function toCloudBo(it: Partial<ItemRecord> & Partial<ItemDraft>): Partial<ItemVo
   };
 }
 
-/** fetchList 进行中的请求（并发去重） */
+/** fetchList 进行中的请求（并发去重；超时自动作废重建，防止挂起阻塞后续刷新） */
 let fetchListTask: Promise<void> | null = null;
+let fetchListTaskAt = 0;
+const FETCH_LIST_TASK_TTL = 15000;
 
 function nowId(): string {
   return `i${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -206,7 +135,7 @@ const useItemStore = defineStore('item', {
     selectedIds: [] as string[],
   }),
   getters: {
-    /** 云端模式：有令牌即走 /xiaoqi/item（游客账号同样云端保存）；无令牌降级本地模式 */
+    /** 云端模式：有令牌即走 /app/xq/item（游客账号同样云端保存）；无令牌降级本地模式 */
     isCloudMode(): boolean {
       return isLogin();
     },
@@ -261,16 +190,18 @@ const useItemStore = defineStore('item', {
   },
   actions: {
     /**
-     * 拉取云端物品列表（XqItemController GET /xiaoqi/item/list）。
+     * 拉取云端物品列表（XqItemController GET /app/xq/item/list）。
      * 云端数据覆盖本地（登录前新增的本地游客条目保留，待合并流程上传）；失败静默，保持本地数据。
      */
     fetchList(): Promise<void> {
       if (!this.isCloudMode) {
         return Promise.resolve();
       }
-      if (fetchListTask) {
+      // 并发去重：进行中的 task 直接复用；超过 TTL 视为挂起，作废重建
+      if (fetchListTask && Date.now() - fetchListTaskAt < FETCH_LIST_TASK_TTL) {
         return fetchListTask;
       }
+      fetchListTaskAt = Date.now();
       fetchListTask = (async () => {
         try {
           await loadCategoryCache();
@@ -308,22 +239,6 @@ const useItemStore = defineStore('item', {
         return;
       }
       ItemApi.update({ id, ...bo }).catch(error => console.warn('item cloud sync failed:', error));
-    },
-
-    /**
-     * 首启动注入演示数据（仅本地模式；原型 07 默认态需要列表内容）
-     * 只注入一次：SEED_KEY 写入后，即使用户把物品全部清空也不会再次生成
-     */
-    ensureSeedDemo() {
-      if (this.isCloudMode || !DEMO_ENABLED || storage.get(SEED_KEY) === '1') {
-        return;
-      }
-      storage.set(SEED_KEY, '1');
-      if (this.list.length > 0) {
-        return;
-      }
-      this.list = seedDemoItems();
-      this.persist();
     },
 
     persist() {
@@ -395,25 +310,37 @@ const useItemStore = defineStore('item', {
         changed.push(it.id);
       });
       this.persist();
-      changed.forEach(id => this.syncUpdate(id));
+      // 归档走服务端状态流转（同时写 xq_item_archive_log），不再走整条 update
+      if (this.isCloudMode) {
+        const archiveType = mode === 'used' ? 0 : 1;
+        changed.filter(id => /^\d+$/.test(id)).forEach((id) => {
+          ItemApi.archive(id, archiveType).catch(error => console.warn('item archive failed:', error));
+        });
+      }
     },
 
     /** 恢复到在用（归档 / 回收站均可恢复） */
     restore(ids: string[]) {
       const idSet = new Set(ids);
-      const changed: string[] = [];
+      const changed: Array<{ id: string; wasTrashed: boolean }> = [];
       this.list.forEach((it) => {
         if (idSet.has(it.id)) {
+          const wasTrashed = it.status === 'trashed';
           it.status = 'active';
           it.archivedAt = undefined;
           it.usedDays = undefined;
           it.trashedAt = undefined;
           it.updatedAt = today();
-          changed.push(it.id);
+          changed.push({ id: it.id, wasTrashed });
         }
       });
       this.persist();
-      changed.forEach(id => this.syncUpdate(id));
+      if (this.isCloudMode) {
+        changed.filter(item => /^\d+$/.test(item.id)).forEach((item) => {
+          const request = item.wasTrashed ? ItemApi.recycleRestore(item.id) : ItemApi.restoreArchived(item.id);
+          request.catch(error => console.warn('item restore failed:', error));
+        });
+      }
     },
 
     /** 移入回收站（30 天保留期，到期彻底删除） */
@@ -429,10 +356,14 @@ const useItemStore = defineStore('item', {
         }
       });
       this.persist();
-      changed.forEach(id => this.syncUpdate(id));
+      if (this.isCloudMode) {
+        changed.filter(id => /^\d+$/.test(id)).forEach((id) => {
+          ItemApi.moveToRecycle(id).catch(error => console.warn('item trash failed:', error));
+        });
+      }
     },
 
-    /** 彻底删除（仅在回收站内提供，需二次确认）；云端模式调批量删除 */
+    /** 彻底删除（仅在回收站内提供，需二次确认） */
     deleteForever(ids: string[]) {
       const idSet = new Set(ids);
       const removed = this.list.filter(it => idSet.has(it.id) && /^\d+$/.test(it.id)).map(it => it.id);
@@ -440,7 +371,10 @@ const useItemStore = defineStore('item', {
       this.selectedIds = this.selectedIds.filter(id => !idSet.has(id));
       this.persist();
       if (this.isCloudMode && removed.length) {
-        ItemApi.remove(removed).catch(error => console.warn('item cloud remove failed:', error));
+        // 服务端彻底删除走回收站 purge，会写归档日志；不能走通用 DELETE
+        removed.forEach((id) => {
+          ItemApi.purge(id).catch(error => console.warn('item purge failed:', error));
+        });
       }
     },
 
@@ -455,7 +389,9 @@ const useItemStore = defineStore('item', {
       target.dueDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
       target.updatedAt = today();
       this.persist();
-      this.syncUpdate(id);
+      if (this.isCloudMode && /^\d+$/.test(id)) {
+        ItemApi.renew(id, days).catch(error => console.warn('item renew failed:', error));
+      }
     },
 
     /** 批量管理：单选 / 取消 */
@@ -477,7 +413,7 @@ const useItemStore = defineStore('item', {
      * 游客数据合并（原型 26 / 备份恢复共用）
      * - merge：按名称判重，命中合并（数量取 max、可见范围取更严格方），缺到期日计待确认
      * - cloud / local：全部按来源写入，本机新增项保留
-     * 云端模式：可上传条目调 POST /xiaoqi/item，成功后移除本地副本并 fetchList 以云端为准；
+     * 云端模式：可上传条目调 POST /app/xq/item，成功后移除本地副本并 fetchList 以云端为准；
      * 上传失败或分类缺失的条目保留本地（仍带 guest 标记），可再次合并
      */
     mergeGuest(items: Partial<ItemRecord>[], strategy: MergeStrategy): MergeResult {
